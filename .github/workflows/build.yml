@@ -1,4 +1,4 @@
-name: Build
+name: Build application and self-host images
 
 on:
   push:
@@ -15,9 +15,9 @@ concurrency:
 
 jobs:
   build:
-    name: Build API and web app
+    name: Build application and self-host images
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Check out source
@@ -48,3 +48,9 @@ jobs:
       - name: Build web app
         working-directory: src/web/business-workflow-engine-web
         run: npm run build
+
+      - name: Validate production Compose configuration
+        run: docker compose --env-file .env.example -f compose.production.yaml config --quiet
+
+      - name: Build production Compose images
+        run: docker compose --parallel 1 --env-file .env.example -f compose.production.yaml build

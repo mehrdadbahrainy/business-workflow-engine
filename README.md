@@ -24,7 +24,7 @@ The engine currently implements this one seeded definition. It is not a general-
 - Angular 21
 - Modular monolith deployment
 
-Pull requests and pushes to `main` build the .NET API and Angular application in GitHub Actions. The workflow is a build gate; it does not currently run automated tests.
+Pull requests and pushes to `main` build the .NET API, Angular application, and production Docker Compose images in GitHub Actions. The workflow is a build gate; it does not currently run automated tests.
 
 ## Run locally
 

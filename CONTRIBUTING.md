@@ -28,7 +28,7 @@ npm ci
 npm run build
 ```
 
-The current GitHub Actions check runs these API and web builds. It does not run an automated test suite yet; describe the relevant manual verification in your pull request when behavior changes.
+The current GitHub Actions check runs these API and web builds, validates the production Compose configuration, and builds its API and web images. It does not run an automated test suite yet; describe the relevant manual verification in your pull request when behavior changes.
 
 ## Pull requests
 
