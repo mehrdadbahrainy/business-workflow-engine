@@ -8,7 +8,7 @@ interface RequestItem {
   status: string; outcome: string | null; createdAt: string;
 }
 interface ApprovalTask { id: string; workflowInstanceId: string; request: RequestItem; createdAt: string; }
-interface RequestDetails { request: RequestItem; events: { type: string; actorSubject: string; dataJson: string | null; occurredAt: string }[]; }
+interface RequestDetails { request: RequestItem; events: { type: string; actorSubject: string; data: unknown | null; occurredAt: string }[]; }
 
 @Component({
   selector: 'app-root',
@@ -69,12 +69,16 @@ export class App implements OnInit {
     });
   }
 
-  eventSummary(dataJson: string | null): string | null {
-    if (!dataJson) return null;
-    try {
-      const data = JSON.parse(dataJson) as { comment?: string | null; assignedTo?: string; amount?: number; currency?: string };
-      return data.comment || data.assignedTo || (data.amount !== undefined ? `${data.amount} ${data.currency ?? ''}`.trim() : null);
-    } catch { return null; }
+  eventSummary(value: unknown): string | null {
+    if (typeof value !== 'object' || value === null) return null;
+    const data = value as { comment?: unknown; assignedTo?: unknown; amount?: unknown; currency?: unknown };
+    if (typeof data.comment === 'string' && data.comment) return data.comment;
+    if (typeof data.assignedTo === 'string') return data.assignedTo;
+    if (typeof data.amount === 'number') {
+      const currency = typeof data.currency === 'string' ? data.currency : '';
+      return `${data.amount} ${currency}`.trim();
+    }
+    return null;
   }
 
   private showError(error: HttpErrorResponse): void {

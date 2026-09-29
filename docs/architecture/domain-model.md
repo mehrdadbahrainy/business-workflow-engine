@@ -30,7 +30,7 @@ A unit of human work created when an instance reaches an approval step. It recor
 
 ### Execution Event
 
-An append-only record of a meaningful fact in the instance lifecycle, such as request started, approval requested, or a decision recorded. Events provide the chronological explanation shown to operators; current instance state provides an efficient view of where work stands now. `ActorSubject` identifies who performed the action: human-initiated events use the authenticated subject, while deterministic routing and policy events use the stable `system:workflow-engine` subject.
+An append-only record of a meaningful fact in the instance lifecycle, such as request started, approval requested, or a decision recorded. Events provide the chronological explanation shown to operators; current instance state provides an efficient view of where work stands now. `ActorSubject` identifies who performed the action: human-initiated events use the authenticated subject, while deterministic routing and policy events use the stable `system:workflow-engine` subject. Event payloads are returned as structured JSON to API clients; the current database stores that payload as serialized JSON text.
 
 ## State model for the first slice
 

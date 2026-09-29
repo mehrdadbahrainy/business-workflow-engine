@@ -66,7 +66,7 @@
             <div class="history-request"><strong>{{ selected.request.description }}</strong><small>{{ selected.request.requesterReference }} · {{ selected.request.status }}</small></div>
             <ol class="timeline">
               @for (event of selected.events; track event.occurredAt + event.type) {
-                <li><span class="timeline-dot"></span><div><strong>{{ event.type.replaceAll('-', ' ') }}</strong><small>{{ event.actorSubject }}</small>@if (eventSummary(event.dataJson); as summary) { <small class="event-summary">{{ summary }}</small> }<time>{{ event.occurredAt | date:'short' }}</time></div></li>
+                <li><span class="timeline-dot"></span><div><strong>{{ event.type.replaceAll('-', ' ') }}</strong><small>{{ event.actorSubject }}</small>@if (eventSummary(event.data); as summary) { <small class="event-summary">{{ summary }}</small> }<time>{{ event.occurredAt | date:'short' }}</time></div></li>
               }
             </ol>
           }

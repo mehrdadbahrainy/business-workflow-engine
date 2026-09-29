@@ -118,7 +118,8 @@ public static class WorkflowEndpoints
         var instance = await db.Instances.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (instance is null) return Results.NotFound();
         if (instance.InitiatorSubject != subject && !await db.ApprovalTasks.AnyAsync(x => x.WorkflowInstanceId == id && x.AssignedSubject == subject, cancellationToken)) return Results.Forbid();
-        var events = await db.ExecutionEvents.AsNoTracking().Where(x => x.WorkflowInstanceId == id).OrderBy(x => x.OccurredAt).ThenBy(x => x.Id).Select(x => new ExecutionEventResponse(x.Type, x.ActorSubject, x.DataJson, x.OccurredAt)).ToListAsync(cancellationToken);
+        var eventRows = await db.ExecutionEvents.AsNoTracking().Where(x => x.WorkflowInstanceId == id).OrderBy(x => x.OccurredAt).ThenBy(x => x.Id).Select(x => new { x.Type, x.ActorSubject, x.DataJson, x.OccurredAt }).ToListAsync(cancellationToken);
+        var events = eventRows.Select(x => new ExecutionEventResponse(x.Type, x.ActorSubject, ParseEventData(x.DataJson), x.OccurredAt)).ToList();
         return Results.Ok(new PurchaseRequestDetailsResponse(ToResponse(instance), events));
     }
 
@@ -157,6 +158,13 @@ public static class WorkflowEndpoints
     }
 
     private static string Subject(ClaimsPrincipal user) => user.FindFirstValue("sub") ?? user.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new InvalidOperationException("Authenticated principal has no subject.");
+    private static JsonElement? ParseEventData(string? dataJson)
+    {
+        if (dataJson is null) return null;
+        using var document = JsonDocument.Parse(dataJson);
+        return document.RootElement.Clone();
+    }
+
     private static IResult ExistingStartResult(WorkflowInstance existing, string subject, string requestHash)
     {
         if (existing.InitiatorSubject != subject) return Results.Conflict(new { error = "Idempotency key is already in use." });
@@ -189,7 +197,7 @@ public static class WorkflowEndpoints
     private static PurchaseRequestResponse ToResponse(WorkflowInstance x) => new(x.Id, x.DefinitionName, x.DefinitionRevision, x.RequesterReference, x.Description, x.Amount, x.Currency, x.Status, x.Outcome, x.CreatedAt, x.UpdatedAt);
 
     public sealed record PurchaseRequestResponse(Guid Id, string DefinitionName, int DefinitionRevision, string RequesterReference, string Description, decimal Amount, string Currency, string Status, string? Outcome, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
-    public sealed record ExecutionEventResponse(string Type, string ActorSubject, string? DataJson, DateTimeOffset OccurredAt);
+    public sealed record ExecutionEventResponse(string Type, string ActorSubject, JsonElement? Data, DateTimeOffset OccurredAt);
     public sealed record PurchaseRequestDetailsResponse(PurchaseRequestResponse Request, IReadOnlyList<ExecutionEventResponse> Events);
     public sealed record ApprovalTaskResponse(Guid Id, Guid WorkflowInstanceId, DateTimeOffset CreatedAt, PurchaseRequestResponse Request);
     public sealed record DecisionResponse(Guid TaskId, PurchaseRequestResponse Request);
