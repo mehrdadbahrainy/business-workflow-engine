@@ -49,4 +49,4 @@ The current implementation direction is C#/.NET, ASP.NET Core, EF Core, PostgreS
 
 ## License
 
-The project license has not been selected yet. Until a license is added, the repository should be treated as an early public design repository rather than a reusable open-source software release.
+This project is licensed under the [Apache License 2.0](LICENSE).
