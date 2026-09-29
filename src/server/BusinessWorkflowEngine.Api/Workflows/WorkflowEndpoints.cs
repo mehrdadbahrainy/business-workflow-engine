@@ -1,8 +1,10 @@
+using System.ComponentModel;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace BusinessWorkflowEngine.Api.Workflows;
@@ -14,17 +16,49 @@ public static class WorkflowEndpoints
     public static IEndpointRouteBuilder MapWorkflowEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var api = endpoints.MapGroup("/api/v1").RequireAuthorization();
-        api.MapPost("/purchase-requests", StartRequest);
-        api.MapGet("/purchase-requests", ListRequests);
-        api.MapGet("/purchase-requests/{id:guid}", GetRequest);
-        api.MapGet("/approval-tasks", ListTasks);
-        api.MapPost("/approval-tasks/{id:guid}/decision", Decide);
+        api.MapPost("/purchase-requests", StartRequest)
+            .WithName("StartPurchaseRequest")
+            .WithTags("Purchase requests")
+            .WithSummary("Start a purchase request")
+            .WithDescription("Starts the seeded purchase-approval workflow. Reuse the required Idempotency-Key with the same authenticated subject and request body to retrieve the original instance.")
+            .Produces<PurchaseRequestResponse>(StatusCodes.Status201Created)
+            .Produces<PurchaseRequestResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
+        api.MapGet("/purchase-requests", ListRequests)
+            .WithName("ListPurchaseRequests")
+            .WithTags("Purchase requests")
+            .WithSummary("List requests started by the authenticated subject")
+            .Produces<IReadOnlyList<PurchaseRequestResponse>>(StatusCodes.Status200OK);
+        api.MapGet("/purchase-requests/{id:guid}", GetRequest)
+            .WithName("GetPurchaseRequest")
+            .WithTags("Purchase requests")
+            .WithSummary("Get a purchase request and its execution history")
+            .WithDescription("The caller must have started the request or be assigned to its approval task.")
+            .Produces<PurchaseRequestDetailsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
+        api.MapGet("/approval-tasks", ListTasks)
+            .WithName("ListApprovalTasks")
+            .WithTags("Approval tasks")
+            .WithSummary("List pending approval tasks assigned to the authenticated subject")
+            .Produces<IReadOnlyList<ApprovalTaskResponse>>(StatusCodes.Status200OK);
+        api.MapPost("/approval-tasks/{id:guid}/decision", Decide)
+            .WithName("DecideApprovalTask")
+            .WithTags("Approval tasks")
+            .WithSummary("Approve or reject an assigned task")
+            .WithDescription("Only the assigned approver can decide a pending task. The decision is approve or reject, with an optional comment of up to 1,000 characters.")
+            .Produces<DecisionResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
         return endpoints;
     }
 
-    private static async Task<IResult> StartRequest(PurchaseRequestInput request, HttpContext http, WorkflowDbContext db, CancellationToken cancellationToken)
+    private static async Task<IResult> StartRequest(PurchaseRequestInput request, [FromHeader(Name = "Idempotency-Key"), Description("Required. Reuse with the same authenticated subject and request body to retrieve the original workflow instance.")] string key, HttpContext http, WorkflowDbContext db, CancellationToken cancellationToken)
     {
-        var key = http.Request.Headers["Idempotency-Key"].FirstOrDefault();
         if (string.IsNullOrWhiteSpace(key) || key.Length > 200)
             return Results.BadRequest(new { error = "Provide an Idempotency-Key header (maximum 200 characters)." });
         if (string.IsNullOrWhiteSpace(request.Description) || request.Description.Length > 500 || request.Amount <= 0 || request.Amount > 100_000_000 || !string.Equals(request.Currency, "USD", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(request.RequesterReference) || request.RequesterReference.Length > 100)
@@ -84,14 +118,14 @@ public static class WorkflowEndpoints
         var instance = await db.Instances.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (instance is null) return Results.NotFound();
         if (instance.InitiatorSubject != subject && !await db.ApprovalTasks.AnyAsync(x => x.WorkflowInstanceId == id && x.AssignedSubject == subject, cancellationToken)) return Results.Forbid();
-        var events = await db.ExecutionEvents.AsNoTracking().Where(x => x.WorkflowInstanceId == id).OrderBy(x => x.OccurredAt).ThenBy(x => x.Id).Select(x => new { x.Type, x.ActorSubject, x.DataJson, x.OccurredAt }).ToListAsync(cancellationToken);
-        return Results.Ok(new { request = ToResponse(instance), events });
+        var events = await db.ExecutionEvents.AsNoTracking().Where(x => x.WorkflowInstanceId == id).OrderBy(x => x.OccurredAt).ThenBy(x => x.Id).Select(x => new ExecutionEventResponse(x.Type, x.ActorSubject, x.DataJson, x.OccurredAt)).ToListAsync(cancellationToken);
+        return Results.Ok(new PurchaseRequestDetailsResponse(ToResponse(instance), events));
     }
 
     private static async Task<IResult> ListTasks(WorkflowDbContext db, ClaimsPrincipal user, CancellationToken cancellationToken)
     {
         var subject = Subject(user);
-        var tasks = await db.ApprovalTasks.AsNoTracking().Where(x => x.AssignedSubject == subject && x.Status == "pending").OrderBy(x => x.CreatedAt).Join(db.Instances.AsNoTracking(), task => task.WorkflowInstanceId, instance => instance.Id, (task, instance) => new { task.Id, task.WorkflowInstanceId, task.CreatedAt, request = ToResponse(instance) }).ToListAsync(cancellationToken);
+        var tasks = await db.ApprovalTasks.AsNoTracking().Where(x => x.AssignedSubject == subject && x.Status == "pending").OrderBy(x => x.CreatedAt).Join(db.Instances.AsNoTracking(), task => task.WorkflowInstanceId, instance => instance.Id, (task, instance) => new ApprovalTaskResponse(task.Id, task.WorkflowInstanceId, task.CreatedAt, ToResponse(instance))).ToListAsync(cancellationToken);
         return Results.Ok(tasks);
     }
 
@@ -119,7 +153,7 @@ public static class WorkflowEndpoints
         db.ExecutionEvents.Add(NewEvent(instance.Id, eventType, subject, now, new { comment = task.DecisionComment }));
         try { await db.SaveChangesAsync(cancellationToken); await transaction.CommitAsync(cancellationToken); }
         catch (DbUpdateConcurrencyException) { return Results.Conflict(new { error = "The task was decided concurrently." }); }
-        return Results.Ok(new { taskId = task.Id, request = ToResponse(instance) });
+        return Results.Ok(new DecisionResponse(task.Id, ToResponse(instance)));
     }
 
     private static string Subject(ClaimsPrincipal user) => user.FindFirstValue("sub") ?? user.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new InvalidOperationException("Authenticated principal has no subject.");
@@ -152,8 +186,13 @@ public static class WorkflowEndpoints
     }
 
     private static ExecutionEvent NewEvent(Guid id, string type, string actor, DateTimeOffset at, object data) => new() { WorkflowInstanceId = id, Type = type, ActorSubject = actor, OccurredAt = at, DataJson = JsonSerializer.Serialize(data) };
-    private static object ToResponse(WorkflowInstance x) => new { x.Id, x.DefinitionName, x.DefinitionRevision, x.RequesterReference, x.Description, x.Amount, x.Currency, x.Status, x.Outcome, x.CreatedAt, x.UpdatedAt };
+    private static PurchaseRequestResponse ToResponse(WorkflowInstance x) => new(x.Id, x.DefinitionName, x.DefinitionRevision, x.RequesterReference, x.Description, x.Amount, x.Currency, x.Status, x.Outcome, x.CreatedAt, x.UpdatedAt);
 
+    public sealed record PurchaseRequestResponse(Guid Id, string DefinitionName, int DefinitionRevision, string RequesterReference, string Description, decimal Amount, string Currency, string Status, string? Outcome, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+    public sealed record ExecutionEventResponse(string Type, string ActorSubject, string? DataJson, DateTimeOffset OccurredAt);
+    public sealed record PurchaseRequestDetailsResponse(PurchaseRequestResponse Request, IReadOnlyList<ExecutionEventResponse> Events);
+    public sealed record ApprovalTaskResponse(Guid Id, Guid WorkflowInstanceId, DateTimeOffset CreatedAt, PurchaseRequestResponse Request);
+    public sealed record DecisionResponse(Guid TaskId, PurchaseRequestResponse Request);
     public sealed record PurchaseRequestInput(string RequesterReference, string Description, decimal Amount, string Currency);
     public sealed record DecisionRequest(string Decision, string? Comment);
 }
