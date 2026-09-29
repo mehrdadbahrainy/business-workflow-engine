@@ -118,6 +118,8 @@ The seeded threshold is denominated in USD; the first implementation accepts USD
 
 ## Design notes
 
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
 - [Problem statement and product hypothesis](docs/product/problem-statement.md)
 - [Product discovery plan](docs/product/validation-plan.md)
 - [First use case: purchase approval](docs/product/first-use-case.md)

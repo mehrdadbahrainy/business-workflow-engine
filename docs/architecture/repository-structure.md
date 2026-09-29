@@ -4,6 +4,10 @@
 
 ```text
 .
+├── CONTRIBUTING.md
+├── LICENSE
+├── README.md
+├── SECURITY.md
 ├── .config/
 │   └── dotnet-tools.json
 ├── .github/
