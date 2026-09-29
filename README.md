@@ -53,7 +53,7 @@ npm start
 
 Open the Angular dev-server URL shown in the terminal. Its `/api` requests proxy to the local API. In Development only, the UI sends an `X-Demo-User` identity header. Switch to `manager@example.test` in the top bar to see and decide requests waiting for the seeded approver. This demo identity handler is not enabled outside the Development environment. For a secured deployment, provide a JWT from the configured host identity provider in the **Host API token** field; the UI keeps it in the current browser tab's session storage. The project does not implement an identity-provider login flow.
 
-The API's OpenAPI document is available at `http://localhost:5195/openapi/v1.json` while running in Development. It describes the HTTP operations and the required `Idempotency-Key` header; OpenAPI is not exposed by the production configuration.
+The API's OpenAPI document is available at `http://localhost:5195/openapi/v1.json` while running in Development. It describes the HTTP operations, the required `Idempotency-Key` header, and the Development-only `X-Demo-User` authentication scheme; OpenAPI is not exposed by the production configuration.
 
 ## Self-host with Docker Compose
 

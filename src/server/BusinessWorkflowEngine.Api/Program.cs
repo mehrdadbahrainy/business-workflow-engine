@@ -6,7 +6,11 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<AuthenticationOpenApiDocumentTransformer>();
+    options.AddOperationTransformer<AuthenticationOpenApiOperationTransformer>();
+});
 var connectionString = builder.Configuration.GetConnectionString("WorkflowDatabase")
     ?? throw new InvalidOperationException("ConnectionStrings:WorkflowDatabase is required.");
 builder.Services.AddDbContext<WorkflowDbContext>(options => options.UseNpgsql(connectionString));
