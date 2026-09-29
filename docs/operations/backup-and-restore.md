@@ -32,23 +32,29 @@ Move the resulting archive to the deployment's protected off-host backup locatio
 
 > **Destructive:** restoring replaces the current application database. Schedule a maintenance window, verify the archive and target environment, and preserve a separate copy of the current database before proceeding. Keep the API and web containers stopped until the restore and checks are complete.
 
-Set `$archive` to the backup file to restore. This procedure stops API and web traffic, drops and recreates the configured application database, and restores the archive into that database. The PostgreSQL container and its named volume remain in place.
+Set `$archive` to the backup file to restore. The first commands copy the archive into the PostgreSQL container and check that `pg_restore` can read its archive catalog while the application remains online. Only after that check passes do the commands stop API and web traffic, drop and recreate the configured application database, and restore the archive into it. The PostgreSQL container and its named volume remain in place.
 
 ```powershell
 $compose = @("compose", "--env-file", ".env", "-f", "compose.production.yaml")
 $archivePath = Read-Host "Path to the backup archive"
 $archive = (Resolve-Path -LiteralPath $archivePath).Path
 
-& docker @compose stop api web
-if ($LASTEXITCODE -ne 0) { throw "Could not stop the API and web containers." }
-
 & docker @compose cp $archive postgres:/tmp/workflow-engine-restore.dump
 if ($LASTEXITCODE -ne 0) { throw "Copying the archive into the PostgreSQL container failed." }
+
+& docker @compose exec -T postgres sh -c 'pg_restore --list /tmp/workflow-engine-restore.dump >/dev/null'
+if ($LASTEXITCODE -ne 0) {
+    & docker @compose exec -T postgres rm -f /tmp/workflow-engine-restore.dump
+    throw "The archive could not be read. The application is still running; verify the backup file before retrying."
+}
+
+& docker @compose stop api web
+if ($LASTEXITCODE -ne 0) { throw "Could not stop the API and web containers." }
 
 & docker @compose exec -T postgres sh -c 'dropdb --if-exists --username="$POSTGRES_USER" "$POSTGRES_DB" && createdb --username="$POSTGRES_USER" --owner="$POSTGRES_USER" "$POSTGRES_DB"'
 if ($LASTEXITCODE -ne 0) { throw "Could not recreate the application database. Leave the API and web containers stopped." }
 
-& docker @compose exec -T postgres sh -c 'pg_restore --exit-on-error --no-owner --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" /tmp/workflow-engine-restore.dump'
+& docker @compose exec -T postgres sh -c 'pg_restore --single-transaction --exit-on-error --no-owner --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" /tmp/workflow-engine-restore.dump'
 if ($LASTEXITCODE -ne 0) { throw "Restore failed. Leave the API and web containers stopped and investigate before retrying." }
 
 & docker @compose exec -T postgres rm -f /tmp/workflow-engine-restore.dump
@@ -59,3 +65,5 @@ if ($LASTEXITCODE -ne 0) { throw "The database was restored, but the API and web
 ```
 
 After startup, confirm the API health endpoint responds and inspect a known request and its history through the API/UI. Periodically rehearse restoration into an isolated deployment; a successful dump command alone does not prove that recovery will meet operational needs.
+
+Only restore archives from a trusted source. PostgreSQL warns that restoring a dump can execute SQL selected by the source database superuser.
