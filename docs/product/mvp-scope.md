@@ -60,7 +60,7 @@ These are product acceptance conditions, not a request to add automated tests at
 - A catalog of vendor-specific connectors or a replacement for procurement, ERP, or finance software.
 - Executing a purchase, creating a purchase order, or moving money.
 - AI steps, agents, chatbot features, or AI-generated workflow definitions.
-- Multi-tenancy, enterprise SSO, fine-grained permission administration, and compliance certifications.
+- Multi-tenancy, user provisioning, provider-specific SSO, fine-grained permission administration, and compliance certifications. The runtime still validates API bearer tokens and enforces that only the assigned subject can decide an approval.
 - Horizontal scaling claims, microservices, and a message broker before the single-instance lifecycle is understood.
 
 ## Product and engineering guardrails
@@ -74,7 +74,6 @@ These are product acceptance conditions, not a request to add automated tests at
 ## Decisions deferred
 
 - Whether the initiating application receives outcomes only by querying the API or also through an outbound webhook.
-- How user identities and authentication are supplied by a host application versus the workflow product.
-- Whether the workflow definition is represented as JSON, a typed SDK, or both.
+- How workflow-definition revisions will be managed after the seeded MVP definition.
 - How failures in external actions are surfaced and retried; no external side-effect action is required to prove this MVP.
 - The exact purchase policy and whether the threshold branch is representative of a real target team.

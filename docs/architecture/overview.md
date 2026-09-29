@@ -28,6 +28,7 @@ The initial deployment is a modular monolith: one backend application, one relat
 - **Human Tasks:** approval assignment, pending work, authorization of a decision, and task completion.
 - **Execution History:** the recorded facts operators use to understand what happened. It is written consistently with the state changes it describes; it is not a separate event-sourced platform.
 - **HTTP API:** versioned integration surface for starting workflows, querying requests, and completing assigned approvals.
+- **Identity boundary:** validate host-issued JWT bearer tokens in non-development environments and match the authenticated subject to the assigned approver. Local demo identity is development-only.
 
 These are domain boundaries, not a commitment to one project-per-module layout. They may share a process and database while ownership remains clear.
 
@@ -57,7 +58,7 @@ The model stores current instance state for efficient reads and keeps an append-
 - **Storage:** PostgreSQL for durable process state.
 - **Deployment:** one self-hosted installation for one organization in the MVP.
 
-An outbound webhook, vendor-specific connectors, SSO, and multi-tenancy are deferred. The API query is sufficient to demonstrate the initial handoff and retrieve the outcome; callback delivery can be added when a validated integration needs it.
+An outbound webhook, vendor-specific connectors, user provisioning, provider-specific SSO, and multi-tenancy are deferred. The API query is sufficient to demonstrate the initial handoff and retrieve the outcome; callback delivery can be added when a validated integration needs it.
 
 ## Why not distribute the first version?
 
@@ -67,8 +68,7 @@ Reconsider distribution only when a module has a real independent scaling, avail
 
 ## Deferred architecture questions
 
-- How workflow definitions are authored and validated (controlled JSON, typed code, or another format).
-- The exact authentication mechanism and how host-application identities map to approvers.
+- How workflow-definition revisions are published and retained after the seeded MVP definition.
 - Whether outbound webhooks become a core integration path and require a transactional outbox.
 - Whether a durable job worker becomes necessary when external actions, timers, or retries enter scope.
 - How definition revisions are published and retained after active instances finish.

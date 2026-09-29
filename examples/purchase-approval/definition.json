@@ -1,0 +1,6 @@
+{
+  "name": "purchase-approval",
+  "revision": 1,
+  "approvalThreshold": 1000,
+  "approverSubject": "manager@example.test"
+}

@@ -1,78 +1,68 @@
 # Initial Domain Model
 
-**Status:** Proposed model for the MVP. Names and boundaries should be revisited when the first workflow is implemented and exercised.
+**Status:** Initial model, updated to reflect the first purchase-approval implementation. Names and boundaries should be revisited as more workflows are exercised.
 
 ## Modeling focus
 
-The MVP coordinates a request through a defined process, may wait for a human decision, and must retain a clear history. The domain therefore distinguishes the reusable process definition, one execution of that definition, the human work created during an execution, and the recorded facts about execution.
+The MVP coordinates a request through a defined process, may wait for a human decision, and must retain a clear history. The domain distinguishes a reusable process definition, one execution of that definition, the human work created during an execution, and the recorded facts about execution.
 
 ## Core concepts
 
 ### Workflow Definition
 
-A published description of a process: its identity, revision, inputs, executable steps, and transitions. A definition is a plan for future executions, not a running process.
+A published description of a process: its identity, revision, inputs, supported behavior, and transitions. The initial purchase-approval definition is a versioned JSON document containing the approval threshold and approver subject. The loaded revision is persisted and each instance records the revision it started with.
 
-For the MVP, the definition needs only the purchase-approval path: validate input, evaluate a threshold, wait for one assigned approval when required, and finish with an outcome. Authoring remains controlled and small; this model does not imply a visual designer or arbitrary scripting.
+The MVP supports only the seeded purchase-approval path. It does not provide a visual designer, general workflow language, or definition-management API.
 
 ### Workflow Instance
 
-One execution created from a specific published definition revision, linked to its business request and input data. An instance tracks its current lifecycle state and current position in the process. It can remain waiting without holding an application request open.
+One execution created from a specific definition revision, linked to its business request and input data. The instance stores current lifecycle state and outcome. It can remain waiting without holding an application request open.
 
 An instance must continue under the revision with which it started, even if a newer definition is published later.
 
 ### Step Execution
 
-The execution of one step for one workflow instance. It records the step identity, its state, and relevant input/output references. A definition step describes what may happen; a step execution records what did happen for this instance.
-
-The MVP needs validation, a deterministic condition, a human approval, and completion. It does not need a general plugin system for arbitrary step types.
+A separate record for the execution of one step in a workflow instance is not persisted in the first implementation. Instance state and execution events represent the single approval handoff. Add first-class step records only when a concrete workflow needs multiple independently tracked execution steps.
 
 ### Approval Task
 
-A unit of human work created when an instance reaches an approval step. It records the assigned approver, the decision, an optional comment, and completion time. A task is actionable only while open and only by its assigned approver.
+A unit of human work created when an instance reaches an approval step. It records the assigned approver, decision, optional comment, and completion time. A task is actionable only while pending and only by its assigned approver.
 
 ### Execution Event
 
-An append-only record of a meaningful fact in the instance lifecycle, such as request accepted, validation failed, approval requested, approval decided, or instance completed. Events provide the chronological explanation shown to operators; the current instance state provides an efficient view of where work stands now.
+An append-only record of a meaningful fact in the instance lifecycle, such as request started, approval requested, or a decision recorded. Events provide the chronological explanation shown to operators; current instance state provides an efficient view of where work stands now.
 
 ## State model for the first slice
 
 ### Workflow instance
 
-`Running` → `WaitingForApproval` → `Running` → `Completed`
+- A request at or below the configured USD 1,000 threshold reaches `completed` with outcome `auto-approved`.
+- A request above the threshold enters `awaiting-approval` and has one pending approval task.
+- An approval decision moves the instance to `completed` with outcome `approved` or `rejected`.
 
-The alternative approval outcome is:
-
-`WaitingForApproval` → `Rejected`
-
-The workflow's terminal state describes the execution, while its outcome describes the business decision. A manager-approved request reaches `Completed` with outcome `Approved`; a below-threshold request reaches `Completed` with outcome `ApprovedByPolicy`; a rejected request reaches `Rejected` with outcome `Rejected`. None of these outcomes means that an order was placed or fulfilled. Invalid input is rejected before an instance is accepted, with a clear API validation response.
+Rejection is a business outcome; `completed` remains the terminal workflow state. None of these outcomes means an order was placed or fulfilled. Invalid input is rejected before an instance is accepted.
 
 ### Approval task
 
-`Open` → `Approved`
-
-or
-
-`Open` → `Rejected`
-
-No other task transition is required for the MVP.
+- `pending` transitions once to `approve` or `reject`.
+- A repeated or concurrent decision cannot silently overwrite the recorded decision.
 
 ## Invariants to preserve
 
 1. Every instance references one immutable definition revision.
-2. A waiting-for-approval instance has exactly one open approval task in this MVP.
+2. A waiting-for-approval instance has exactly one pending approval task in this MVP.
 3. An approval task can be completed once; repeated or concurrent decisions cannot silently overwrite the recorded decision.
 4. An actor who is not assigned to an approval task cannot complete it.
 5. Every externally visible state transition has a corresponding execution event.
-6. Repeating a request submission with the same idempotency key does not create another instance for that request.
+6. Repeating a request submission with the same idempotency key does not create another instance.
 7. Instance state, task completion, and their corresponding event are persisted consistently.
 
 ## Deliberate omissions
 
-This model does not yet introduce a general event-sourced aggregate framework, saga orchestration, compensation, parallel tokens, arbitrary timers, process mining, business calendars, or a broad task-management domain. Those concepts should be added only when a concrete workflow requires them.
+This model does not introduce a general event-sourced aggregate framework, saga orchestration, compensation, parallel tokens, arbitrary timers, process mining, business calendars, or a broad task-management domain. Those concepts should be added only when a concrete workflow requires them.
 
 ## Open modeling questions
 
 - Should the business request be owned by the host application, or should the engine store a normalized request record in addition to workflow input?
-- Is an approval task always a distinct domain object, or can it remain a specialized step execution until more human-task behavior is needed?
+- When a second workflow needs independently tracked steps, should they be represented as step executions or as a more general runtime construct?
 - Should instance state be maintained as a transactional projection of execution events, or updated alongside events in an ordinary relational model?
-- Which definition representation keeps the initial model understandable while supporting a second real workflow later?

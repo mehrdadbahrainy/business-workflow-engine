@@ -1,1 +1,77 @@
-<router-outlet />
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Business Workflow Engine home"><span class="brand-mark">W</span><span>Business Workflow Engine<small>Operations console</small></span></a>
+    <div class="identity"><span class="online"></span><label for="actor">Subject (Development)</label><input id="actor" [(ngModel)]="actor" (keyup.enter)="switchActor()"><button class="quiet" (click)="switchActor()">Switch</button><input aria-label="Host API access token" type="password" placeholder="Host API token" [(ngModel)]="accessToken" (blur)="saveAccessToken()"></div>
+  </header>
+
+  <main>
+    <section class="welcome">
+      <div><p class="eyebrow">PURCHASE APPROVAL · WORKSPACE</p><h1>Requests move forward.</h1><p class="subhead">Start a purchase request, review assigned approvals, and see each step in its history.</p></div>
+      <button class="refresh" (click)="refresh()" aria-label="Refresh workspace">↻ <span>Refresh</span></button>
+    </section>
+
+    @if (error) { <div class="alert error" role="alert">{{ error }}</div> }
+    @if (success) { <div class="alert success" role="status">{{ success }}</div> }
+
+    <section class="stats" aria-label="Workspace summary">
+      <article class="stat"><span class="stat-icon indigo">↗</span><div><small>My requests</small><strong>{{ requests.length }}</strong></div></article>
+      <article class="stat"><span class="stat-icon amber">⌛</span><div><small>Waiting on me</small><strong>{{ tasks.length }}</strong></div></article>
+      <article class="stat"><span class="stat-icon green">✓</span><div><small>Completed</small><strong>{{ requests.filter(r => r.status === 'completed').length }}</strong></div></article>
+    </section>
+
+    <section class="columns">
+      <div class="main-column">
+        <section class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">INTEGRATED REQUEST</p><h2>Start a purchase request</h2></div><span class="tag">Rule · $1,000</span></div>
+          <form class="request-form" (ngSubmit)="createRequest()">
+            <label>Reference<input name="reference" [(ngModel)]="form.requesterReference" required maxlength="100" placeholder="e.g. REQ-1002"></label>
+            <label>Description<input name="description" [(ngModel)]="form.description" required maxlength="500" placeholder="What are you purchasing?"></label>
+            <div class="form-row"><label>Amount (USD)<input name="amount" type="number" [(ngModel)]="form.amount" required min="0.01" step="0.01"></label><label>Currency<input value="USD" disabled aria-label="Currency USD"></label></div>
+            <button class="primary" type="submit" [disabled]="busy">{{ busy ? 'Starting…' : 'Start request' }} <span>→</span></button>
+            <p class="form-note">Requests over $1,000 wait for <strong>manager@example.test</strong>.</p>
+          </form>
+        </section>
+
+        <section class="panel list-panel">
+          <div class="panel-heading"><div><p class="eyebrow">TRACKING</p><h2>My requests</h2></div><span class="count">{{ requests.length }} total</span></div>
+          @if (requests.length === 0) { <div class="empty">No requests yet. Start one above to see its progress.</div> }
+          @for (request of requests; track request.id) {
+            <button class="request-row" [class.selected]="selected?.request?.id === request.id" (click)="open(request.id)">
+              <span class="request-symbol">▤</span><span class="request-info"><strong>{{ request.description }}</strong><small>{{ request.requesterReference }} · {{ request.createdAt | date:'mediumDate' }}</small></span>
+              <span class="amount">{{ request.amount | currency:request.currency:'symbol':'1.0-2' }}</span><span class="status" [class.waiting]="request.status === 'awaiting-approval'" [class.done]="request.status === 'completed'">{{ request.outcome ?? request.status }}</span><span class="chevron">›</span>
+            </button>
+          }
+        </section>
+      </div>
+
+      <aside class="side-column">
+        <section class="panel approvals-panel">
+          <div class="panel-heading"><div><p class="eyebrow">YOUR QUEUE</p><h2>Pending approvals</h2></div><span class="badge">{{ tasks.length }}</span></div>
+          @if (tasks.length === 0) { <div class="empty compact">Nothing waiting on you right now.</div> }
+          @for (task of tasks; track task.id) {
+            <article class="task-card">
+              <div class="task-top"><span class="status waiting">Needs review</span><span class="task-date">{{ task.createdAt | date:'mediumDate' }}</span></div>
+              <h3>{{ task.request.description }}</h3><p>{{ task.request.requesterReference }} · {{ task.request.amount | currency:task.request.currency:'symbol':'1.0-2' }}</p>
+              <button class="text-link" (click)="open(task.workflowInstanceId)">View request history <span>→</span></button>
+              <div class="task-actions"><button class="approve" (click)="decide(task, 'approve')">Approve</button><button class="reject" (click)="decide(task, 'reject')">Reject</button></div>
+            </article>
+          }
+        </section>
+
+        <section class="panel history-panel">
+          <div class="panel-heading"><div><p class="eyebrow">AUDIT TRAIL</p><h2>{{ selected ? 'Request history' : 'Activity' }}</h2></div>@if (selected) { <button class="quiet" (click)="selected = null">Clear</button> }</div>
+          @if (!selected) { <div class="empty compact">Select a request to inspect its recorded steps.</div> }
+          @if (selected) {
+            <div class="history-request"><strong>{{ selected.request.description }}</strong><small>{{ selected.request.requesterReference }} · {{ selected.request.status }}</small></div>
+            <ol class="timeline">
+              @for (event of selected.events; track event.occurredAt + event.type) {
+                <li><span class="timeline-dot"></span><div><strong>{{ event.type.replaceAll('-', ' ') }}</strong><small>{{ event.actorSubject }}</small><time>{{ event.occurredAt | date:'short' }}</time></div></li>
+              }
+            </ol>
+          }
+        </section>
+      </aside>
+    </section>
+    <footer><span>Business Workflow Engine · early access</span><span>Purchase approval · definition v1</span></footer>
+  </main>
+</div>
