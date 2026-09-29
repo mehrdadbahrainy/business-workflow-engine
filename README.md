@@ -1,5 +1,7 @@
 # Business Workflow Engine
 
+[![Build](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/build.yml/badge.svg)](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/build.yml)
+
 An open-source, self-hostable workflow runtime for business requests that cross an application boundary and wait for a human decision. It pairs an application-facing API with an operations interface for pending approvals and request history.
 
 **Project status: early MVP implementation.** The first purchase-approval path is implemented, but the project has not yet been validated with target users or hardened for production use.
@@ -21,6 +23,8 @@ The engine currently implements this one seeded definition. It is not a general-
 - Entity Framework Core 10 / PostgreSQL
 - Angular 21
 - Modular monolith deployment
+
+Pull requests and pushes to `main` build the .NET API and Angular application in GitHub Actions. The workflow is a build gate; it does not currently run automated tests.
 
 ## Run locally
 
@@ -83,6 +87,8 @@ Example decision body:
   "comment": "Within budget."
 }
 ```
+
+The API project's [`BusinessWorkflowEngine.Api.http`](src/server/BusinessWorkflowEngine.Api/BusinessWorkflowEngine.Api.http) file contains a runnable local request, retry, list, history, and approval walkthrough for the VS Code REST Client extension. The task ID in the final decision request is a placeholder; replace it with one returned by the pending-approvals request.
 
 The seeded threshold is denominated in USD; the first implementation accepts USD requests only. There is no purchase order creation, external side effect, outbound webhook, or workflow designer.
 

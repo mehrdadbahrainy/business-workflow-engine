@@ -1,5 +1,60 @@
 @BusinessWorkflowEngine.Api_HostAddress = http://localhost:5195
+@requester = requester@example.test
+@manager = manager@example.test
 
 ### Health check
 GET {{BusinessWorkflowEngine.Api_HostAddress}}/healthz
 Accept: application/json
+
+### Start a request that waits for approval (Development only)
+# @name startPurchaseRequest
+POST {{BusinessWorkflowEngine.Api_HostAddress}}/api/v1/purchase-requests
+X-Demo-User: {{requester}}
+Idempotency-Key: purchase-request-1001
+Content-Type: application/json
+
+{
+  "requesterReference": "REQ-1001",
+  "description": "Replacement laptops",
+  "amount": 1800,
+  "currency": "USD"
+}
+
+### Retry the request above with the same idempotency key
+POST {{BusinessWorkflowEngine.Api_HostAddress}}/api/v1/purchase-requests
+X-Demo-User: {{requester}}
+Idempotency-Key: purchase-request-1001
+Content-Type: application/json
+
+{
+  "requesterReference": "REQ-1001",
+  "description": "Replacement laptops",
+  "amount": 1800,
+  "currency": "USD"
+}
+
+### See requests started by the requester
+GET {{BusinessWorkflowEngine.Api_HostAddress}}/api/v1/purchase-requests
+X-Demo-User: {{requester}}
+Accept: application/json
+
+### See pending approvals as the seeded manager
+# @name pendingApprovals
+GET {{BusinessWorkflowEngine.Api_HostAddress}}/api/v1/approval-tasks
+X-Demo-User: {{manager}}
+Accept: application/json
+
+### Read a request and its execution history
+GET {{BusinessWorkflowEngine.Api_HostAddress}}/api/v1/purchase-requests/{{startPurchaseRequest.response.body.$.id}}
+X-Demo-User: {{requester}}
+Accept: application/json
+
+### Decide a pending task (replace the task ID with one from pendingApprovals)
+POST {{BusinessWorkflowEngine.Api_HostAddress}}/api/v1/approval-tasks/00000000-0000-0000-0000-000000000000/decision
+X-Demo-User: {{manager}}
+Content-Type: application/json
+
+{
+  "decision": "approve",
+  "comment": "Within budget."
+}

@@ -8,7 +8,7 @@ interface RequestItem {
   status: string; outcome: string | null; createdAt: string;
 }
 interface ApprovalTask { id: string; workflowInstanceId: string; request: RequestItem; createdAt: string; }
-interface RequestDetails { request: RequestItem; events: { type: string; actorSubject: string; dataJson: string; occurredAt: string }[]; }
+interface RequestDetails { request: RequestItem; events: { type: string; actorSubject: string; dataJson: string | null; occurredAt: string }[]; }
 
 @Component({
   selector: 'app-root',
@@ -23,6 +23,7 @@ export class App implements OnInit {
   accessToken = sessionStorage.getItem('api-access-token') ?? '';
   requests: RequestItem[] = [];
   tasks: ApprovalTask[] = [];
+  decisionComments: Record<string, string> = {};
   selected: RequestDetails | null = null;
   busy = false;
   error = '';
@@ -61,11 +62,19 @@ export class App implements OnInit {
   }
 
   decide(task: ApprovalTask, decision: 'approve' | 'reject'): void {
-    const comment = decision === 'reject' ? 'Rejected from the operations console.' : 'Approved from the operations console.';
+    const comment = this.decisionComments[task.id]?.trim() || null;
     this.http.post(`/api/v1/approval-tasks/${task.id}/decision`, { decision, comment }).subscribe({
       next: () => { this.success = `Request ${task.request.requesterReference} ${decision === 'approve' ? 'approved' : 'rejected'}.`; this.refresh(); this.open(task.workflowInstanceId); },
       error: error => this.showError(error)
     });
+  }
+
+  eventSummary(dataJson: string | null): string | null {
+    if (!dataJson) return null;
+    try {
+      const data = JSON.parse(dataJson) as { comment?: string | null; assignedTo?: string; amount?: number; currency?: string };
+      return data.comment || data.assignedTo || (data.amount !== undefined ? `${data.amount} ${data.currency ?? ''}`.trim() : null);
+    } catch { return null; }
   }
 
   private showError(error: HttpErrorResponse): void {

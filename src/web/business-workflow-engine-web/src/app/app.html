@@ -38,7 +38,7 @@
           @for (request of requests; track request.id) {
             <button class="request-row" [class.selected]="selected?.request?.id === request.id" (click)="open(request.id)">
               <span class="request-symbol">▤</span><span class="request-info"><strong>{{ request.description }}</strong><small>{{ request.requesterReference }} · {{ request.createdAt | date:'mediumDate' }}</small></span>
-              <span class="amount">{{ request.amount | currency:request.currency:'symbol':'1.0-2' }}</span><span class="status" [class.waiting]="request.status === 'awaiting-approval'" [class.done]="request.status === 'completed'">{{ request.outcome ?? request.status }}</span><span class="chevron">›</span>
+              <span class="amount">{{ request.amount | currency:request.currency:'symbol':'1.0-2' }}</span><span class="status" [class.waiting]="request.status === 'awaiting-approval'" [class.done]="request.outcome === 'approved' || request.outcome === 'auto-approved'" [class.rejected]="request.outcome === 'rejected'">{{ request.outcome ?? request.status }}</span><span class="chevron">›</span>
             </button>
           }
         </section>
@@ -52,6 +52,7 @@
             <article class="task-card">
               <div class="task-top"><span class="status waiting">Needs review</span><span class="task-date">{{ task.createdAt | date:'mediumDate' }}</span></div>
               <h3>{{ task.request.description }}</h3><p>{{ task.request.requesterReference }} · {{ task.request.amount | currency:task.request.currency:'symbol':'1.0-2' }}</p>
+              <textarea [(ngModel)]="decisionComments[task.id]" maxlength="1000" rows="2" placeholder="Decision comment (optional)"></textarea>
               <button class="text-link" (click)="open(task.workflowInstanceId)">View request history <span>→</span></button>
               <div class="task-actions"><button class="approve" (click)="decide(task, 'approve')">Approve</button><button class="reject" (click)="decide(task, 'reject')">Reject</button></div>
             </article>
@@ -65,7 +66,7 @@
             <div class="history-request"><strong>{{ selected.request.description }}</strong><small>{{ selected.request.requesterReference }} · {{ selected.request.status }}</small></div>
             <ol class="timeline">
               @for (event of selected.events; track event.occurredAt + event.type) {
-                <li><span class="timeline-dot"></span><div><strong>{{ event.type.replaceAll('-', ' ') }}</strong><small>{{ event.actorSubject }}</small><time>{{ event.occurredAt | date:'short' }}</time></div></li>
+                <li><span class="timeline-dot"></span><div><strong>{{ event.type.replaceAll('-', ' ') }}</strong><small>{{ event.actorSubject }}</small>@if (eventSummary(event.dataJson); as summary) { <small class="event-summary">{{ summary }}</small> }<time>{{ event.occurredAt | date:'short' }}</time></div></li>
               }
             </ol>
           }

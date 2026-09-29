@@ -113,7 +113,8 @@ public static class WorkflowEndpoints
         instance.Outcome = request.Decision == "approve" ? "approved" : "rejected";
         instance.UpdatedAt = now;
         instance.ConcurrencyToken = Guid.NewGuid();
-        db.ExecutionEvents.Add(NewEvent(instance.Id, $"request-{request.Decision}", subject, now, new { comment = task.DecisionComment }));
+        var eventType = request.Decision == "approve" ? "request-approved" : "request-rejected";
+        db.ExecutionEvents.Add(NewEvent(instance.Id, eventType, subject, now, new { comment = task.DecisionComment }));
         try { await db.SaveChangesAsync(cancellationToken); await transaction.CommitAsync(cancellationToken); }
         catch (DbUpdateConcurrencyException) { return Results.Conflict(new { error = "The task was decided concurrently." }); }
         return Results.Ok(new { taskId = task.Id, request = ToResponse(instance) });
