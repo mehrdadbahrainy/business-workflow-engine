@@ -16,6 +16,7 @@
 .env.*
 !.env.example
 appsettings.Local.json
+workflow-engine-backup-*.dump
 
 # IDE and operating system files
 .idea/

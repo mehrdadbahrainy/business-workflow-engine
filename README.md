@@ -77,6 +77,8 @@ To stop the containers while keeping stored workflow data:
 docker compose --env-file .env -f compose.production.yaml down
 ```
 
+For manual database backups and a restore procedure, see the [backup and restore runbook](docs/operations/backup-and-restore.md). The Compose stack does not schedule backups or provide off-host retention.
+
 The default local database credentials in `appsettings.json` and `compose.yaml` are for development only. Configure `ConnectionStrings__WorkflowDatabase`, `Authentication__Authority`, and `Authentication__Audience` for a hosted deployment. Outside Development, the API validates JWT bearer tokens from the configured authority and uses the authenticated `sub` claim as the actor identity.
 
 ## API overview
@@ -122,6 +124,7 @@ The seeded threshold is denominated in USD; the first implementation accepts USD
 
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
+- [Self-host backup and restore runbook](docs/operations/backup-and-restore.md)
 - [Problem statement and product hypothesis](docs/product/problem-statement.md)
 - [Product discovery plan](docs/product/validation-plan.md)
 - [First use case: purchase approval](docs/product/first-use-case.md)

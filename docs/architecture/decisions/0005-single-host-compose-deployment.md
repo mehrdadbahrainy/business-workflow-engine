@@ -28,7 +28,7 @@ The product hypothesis calls for a self-hosted runtime that can be evaluated wit
 - A single host is a single availability and capacity boundary; no multi-instance execution guarantee is implied.
 - Operators must supply an OIDC issuer and audience, a strong database secret, TLS termination, and a backup policy for the PostgreSQL volume.
 - Database migrations run as the API starts. A coordinated migration job and multi-replica rollout policy are deferred until multiple API replicas are supported.
-- Compose does not configure backups, certificate renewal, identity-provider registration, or host firewall policy.
+- Compose does not schedule backups or configure off-host retention, certificate renewal, identity-provider registration, or host firewall policy. A manual PostgreSQL dump and restore procedure is documented in the [backup and restore runbook](../../operations/backup-and-restore.md).
 - The development Compose file uses local-only database credentials and must not be used as a production deployment.
 
 ## Revisit when

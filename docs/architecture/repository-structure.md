@@ -20,6 +20,7 @@
 │   │   ├── decisions/
 │   │   ├── domain-model.md
 │   │   └── overview.md
+│   ├── operations/
 │   └── product/
 ├── examples/
 │   └── purchase-approval/
