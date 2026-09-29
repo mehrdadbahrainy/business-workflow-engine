@@ -9,6 +9,8 @@ namespace BusinessWorkflowEngine.Api.Workflows;
 
 public static class WorkflowEndpoints
 {
+    private const string WorkflowSystemSubject = "system:workflow-engine";
+
     public static IEndpointRouteBuilder MapWorkflowEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var api = endpoints.MapGroup("/api/v1").RequireAuthorization();
@@ -50,11 +52,11 @@ public static class WorkflowEndpoints
             instance.Status = "awaiting-approval";
             instance.Outcome = null;
             db.ApprovalTasks.Add(new ApprovalTask { Id = Guid.NewGuid(), WorkflowInstanceId = instance.Id, AssignedSubject = definition.ApproverSubject, Status = "pending", CreatedAt = now });
-            events.Add(NewEvent(instance.Id, "approval-requested", subject, now, new { assignedTo = definition.ApproverSubject }));
+            events.Add(NewEvent(instance.Id, "approval-requested", WorkflowSystemSubject, now, new { assignedTo = definition.ApproverSubject }));
         }
         else
         {
-            events.Add(NewEvent(instance.Id, "request-auto-approved", subject, now, new { threshold = definition.ApprovalThreshold }));
+            events.Add(NewEvent(instance.Id, "request-auto-approved", WorkflowSystemSubject, now, new { threshold = definition.ApprovalThreshold }));
         }
         db.Instances.Add(instance);
         db.ExecutionEvents.AddRange(events);
