@@ -30,7 +30,7 @@ The MVP is a usable, self-hostable single-organization product slice—not a gen
 - Show request instances in an Angular operational interface.
 - Provide a pending-approval queue and request details with current state, responsible person, and chronological execution history.
 - Record who made an approval decision and when.
-- Make invalid, rejected, waiting, and completed requests distinguishable.
+- Show the workflow state separately from the business outcome, so an approved request is not mistaken for a fulfilled purchase. Invalid input returns a validation error before an instance is created.
 
 ### Run locally and self-host
 

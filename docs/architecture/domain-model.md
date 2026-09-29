@@ -44,7 +44,7 @@ The alternative approval outcome is:
 
 `WaitingForApproval` → `Rejected`
 
-The threshold path that does not require a manager can move from `Running` to `Completed` with an explicit policy outcome in history. Invalid input is rejected before an instance is accepted, with a clear API validation response.
+The workflow's terminal state describes the execution, while its outcome describes the business decision. A manager-approved request reaches `Completed` with outcome `Approved`; a below-threshold request reaches `Completed` with outcome `ApprovedByPolicy`; a rejected request reaches `Rejected` with outcome `Rejected`. None of these outcomes means that an order was placed or fulfilled. Invalid input is rejected before an instance is accepted, with a clear API validation response.
 
 ### Approval task
 
