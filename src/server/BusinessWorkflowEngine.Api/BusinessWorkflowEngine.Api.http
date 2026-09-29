@@ -1,0 +1,5 @@
+@BusinessWorkflowEngine.Api_HostAddress = http://localhost:5195
+
+### Health check
+GET {{BusinessWorkflowEngine.Api_HostAddress}}/healthz
+Accept: application/json

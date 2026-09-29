@@ -1,6 +1,6 @@
 # Business Workflow Engine
 
-**Status: product and architecture design. No runnable implementation yet.**
+**Status: early implementation. Workflow execution is not implemented yet.**
 
 Business requests should not disappear between people, applications, and manual follow-up.
 
@@ -23,7 +23,25 @@ The initial vertical-slice candidate is purchase-request approval: submit a requ
 
 ## Project status
 
-The repository currently contains product and architecture proposals only. The first MVP is intended to demonstrate that an existing application can start a request, the workflow can wait durably for an assigned approver, and both the host application and an operational UI can inspect the same final outcome.
+The repository contains product and architecture proposals plus initial .NET and Angular application scaffolds. The first MVP is intended to demonstrate that an existing application can start a request, the workflow can wait durably for an assigned approver, and both the host application and an operational UI can inspect the same final outcome. The approval runtime and usable UI are not implemented yet.
+
+## Development scaffold
+
+The API and web application can be started independently:
+
+```powershell
+dotnet restore BusinessWorkflowEngine.sln
+dotnet run --project src/server/BusinessWorkflowEngine.Api
+```
+
+The API scaffold exposes `GET /healthz` and a development-only OpenAPI document. To start the Angular application, run these commands from `src/web/business-workflow-engine-web`:
+
+```powershell
+npm ci
+npm start
+```
+
+The Angular shell does not contain workflow screens yet.
 
 See the [MVP scope](docs/product/mvp-scope.md) for planned behavior and explicit exclusions. Do not treat this repository as production software yet.
 
