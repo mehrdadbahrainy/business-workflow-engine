@@ -54,7 +54,7 @@ Rejection is a business outcome; `completed` remains the terminal workflow state
 3. An approval task can be completed once; repeated or concurrent decisions cannot silently overwrite the recorded decision.
 4. An actor who is not assigned to an approval task cannot complete it.
 5. Every externally visible state transition has a corresponding execution event.
-6. Repeating a request submission with the same idempotency key does not create another instance.
+6. Repeating a request submission with the same actor, idempotency key, and normalized content does not create another instance; different content with the same key is rejected.
 7. Instance state, task completion, and their corresponding event are persisted consistently.
 
 ## Deliberate omissions

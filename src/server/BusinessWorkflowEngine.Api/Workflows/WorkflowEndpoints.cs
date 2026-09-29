@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -27,12 +29,10 @@ public static class WorkflowEndpoints
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["request"] = ["Provide a description (up to 500 characters), requester reference (up to 100 characters), positive amount, and USD currency."] });
 
         var subject = Subject(http.User);
+        var normalizedRequest = NormalizeRequest(request);
+        var requestHash = HashRequest(normalizedRequest);
         var existing = await db.Instances.SingleOrDefaultAsync(x => x.IdempotencyKey == key, cancellationToken);
-        if (existing is not null)
-        {
-            if (existing.InitiatorSubject != subject) return Results.Conflict(new { error = "Idempotency key is already in use." });
-            return Results.Ok(ToResponse(existing));
-        }
+        if (existing is not null) return ExistingStartResult(existing, subject, requestHash);
 
         var definition = await db.Definitions.SingleOrDefaultAsync(x => x.Name == "purchase-approval" && x.Revision == 1, cancellationToken);
         if (definition is null) return Results.Problem("The seeded purchase-approval definition is missing.", statusCode: 503);
@@ -40,9 +40,9 @@ public static class WorkflowEndpoints
         var instance = new WorkflowInstance
         {
             Id = Guid.NewGuid(), DefinitionName = definition.Name, DefinitionRevision = definition.Revision,
-            InitiatorSubject = subject, RequesterReference = request.RequesterReference.Trim(), Description = request.Description.Trim(),
-            Amount = request.Amount, Currency = request.Currency.ToUpperInvariant(), Status = "completed",
-            Outcome = "auto-approved", IdempotencyKey = key, ConcurrencyToken = Guid.NewGuid(), CreatedAt = now, UpdatedAt = now
+            InitiatorSubject = subject, RequesterReference = normalizedRequest.RequesterReference, Description = normalizedRequest.Description,
+            Amount = normalizedRequest.Amount, Currency = normalizedRequest.Currency, Status = "completed",
+            Outcome = "auto-approved", IdempotencyKey = key, RequestHash = requestHash, ConcurrencyToken = Guid.NewGuid(), CreatedAt = now, UpdatedAt = now
         };
         var events = new List<ExecutionEvent> { NewEvent(instance.Id, "request-started", subject, now, new { request.Amount, request.Currency }) };
         if (request.Amount > definition.ApprovalThreshold)
@@ -63,7 +63,7 @@ public static class WorkflowEndpoints
         {
             db.ChangeTracker.Clear();
             var raced = await db.Instances.SingleOrDefaultAsync(x => x.IdempotencyKey == key, cancellationToken);
-            if (raced is not null) return raced.InitiatorSubject == subject ? Results.Ok(ToResponse(raced)) : Results.Conflict();
+            if (raced is not null) return ExistingStartResult(raced, subject, requestHash);
             throw;
         }
         return Results.Created($"/api/v1/purchase-requests/{instance.Id}", ToResponse(instance));
@@ -121,6 +121,34 @@ public static class WorkflowEndpoints
     }
 
     private static string Subject(ClaimsPrincipal user) => user.FindFirstValue("sub") ?? user.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new InvalidOperationException("Authenticated principal has no subject.");
+    private static IResult ExistingStartResult(WorkflowInstance existing, string subject, string requestHash)
+    {
+        if (existing.InitiatorSubject != subject) return Results.Conflict(new { error = "Idempotency key is already in use." });
+        var storedRequestHash = existing.RequestHash ?? HashRequest(new PurchaseRequestInput(existing.RequesterReference, existing.Description, existing.Amount, existing.Currency));
+        if (storedRequestHash != requestHash)
+            return Results.Conflict(new { error = "Idempotency key was already used with different request content." });
+        return Results.Ok(ToResponse(existing));
+    }
+
+    private static PurchaseRequestInput NormalizeRequest(PurchaseRequestInput request) => request with
+    {
+        RequesterReference = request.RequesterReference.Trim(),
+        Description = request.Description.Trim(),
+        Currency = request.Currency.ToUpperInvariant()
+    };
+
+    private static string HashRequest(PurchaseRequestInput request)
+    {
+        var fingerprint = new
+        {
+            request.RequesterReference,
+            request.Description,
+            Amount = request.Amount.ToString("G29", CultureInfo.InvariantCulture),
+            request.Currency
+        };
+        return Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(fingerprint)));
+    }
+
     private static ExecutionEvent NewEvent(Guid id, string type, string actor, DateTimeOffset at, object data) => new() { WorkflowInstanceId = id, Type = type, ActorSubject = actor, OccurredAt = at, DataJson = JsonSerializer.Serialize(data) };
     private static object ToResponse(WorkflowInstance x) => new { x.Id, x.DefinitionName, x.DefinitionRevision, x.RequesterReference, x.Description, x.Amount, x.Currency, x.Status, x.Outcome, x.CreatedAt, x.UpdatedAt };
 

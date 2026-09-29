@@ -11,7 +11,7 @@ An open-source, self-hostable workflow runtime for business requests that cross 
 - Start a purchase request through a versioned HTTP API.
 - Apply the seeded amount threshold: requests at or below USD 1,000 complete automatically; requests above it wait for the configured approver.
 - Persist workflow state, approval tasks, and execution history in PostgreSQL using EF Core migrations.
-- Prevent duplicate starts with an `Idempotency-Key` and prevent decisions by anyone except the assigned approver.
+- Return the original request for a matching `Idempotency-Key` retry, reject reuse of that key with different content, and prevent decisions by anyone except the assigned approver.
 - Review a personal request list, pending approval queue, and request timeline in the Angular operations UI.
 - Complete an approval or rejection and retrieve the recorded outcome.
 
@@ -80,6 +80,8 @@ The default local database credentials in `appsettings.json` and `compose.yaml` 
 ## API overview
 
 All workflow routes require authentication. The API uses the authenticated subject to scope request lists and approval decisions.
+
+For `POST /api/v1/purchase-requests`, retrying with the same actor, key, and normalized request content returns the original instance. Reusing the key with different content or a different actor returns `409 Conflict`.
 
 | Method | Path | Purpose |
 | --- | --- | --- |

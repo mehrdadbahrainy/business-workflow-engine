@@ -44,6 +44,7 @@ public sealed class WorkflowInstance
     public required string Status { get; set; }
     public string? Outcome { get; set; }
     public required string IdempotencyKey { get; set; }
+    public string? RequestHash { get; set; }
     public Guid ConcurrencyToken { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

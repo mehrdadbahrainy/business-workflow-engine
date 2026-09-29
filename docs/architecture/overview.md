@@ -47,7 +47,7 @@ The MVP has no long-running in-memory workflow execution. It also does not need 
 
 PostgreSQL is the durable source of truth for definition revisions, workflow instances, approval tasks, and execution history. EF Core is the persistence boundary selected for the implementation stack.
 
-The state transition, task decision, and corresponding history record must commit consistently. A repeated start with the same idempotency key must resolve to the same instance. Concurrent decisions must not overwrite one another. These guarantees should be enforced by database constraints and concurrency-aware application logic, not by assumptions in the UI.
+The state transition, task decision, and corresponding history record must commit consistently. A repeated start with the same actor, idempotency key, and normalized request content must resolve to the same instance; reusing a key for different content or another actor returns a conflict. Concurrent decisions must not overwrite one another. These guarantees should be enforced by database constraints and concurrency-aware application logic, not by assumptions in the UI.
 
 The model stores current instance state for efficient reads and keeps an append-only history of meaningful transitions. It does not reconstruct all current state by replaying an event log.
 
