@@ -1,9 +1,16 @@
-# Initial Repository Structure
+# Repository Structure
 
-**Status:** Proposed layout for the first implementation slice. Project and folder names are provisional until the project-naming step.
+**Status:** Current implementation layout for the first self-hosted vertical slice.
 
 ```text
 .
+├── .config/
+│   └── dotnet-tools.json
+├── .github/
+│   └── workflows/
+│       └── build.yml
+├── deploy/
+│   └── api.Dockerfile
 ├── docs/
 │   ├── architecture/
 │   │   ├── decisions/
@@ -12,35 +19,33 @@
 │   └── product/
 ├── examples/
 │   └── purchase-approval/
+│       └── definition.json
 ├── src/
 │   ├── server/
 │   │   └── BusinessWorkflowEngine.Api/
-│   │       ├── Modules/
-│   │       │   ├── WorkflowDefinitions/
-│   │       │   ├── WorkflowExecution/
-│   │       │   ├── HumanTasks/
-│   │       │   └── ExecutionHistory/
-│   │       ├── Api/
-│   │       └── Persistence/
+│   │       ├── Operations/
+│   │       └── Workflows/
+│   │           └── Migrations/
 │   └── web/
 │       └── business-workflow-engine-web/
-└── tests/
-    ├── BusinessWorkflowEngine.UnitTests/
-    └── BusinessWorkflowEngine.IntegrationTests/
+│           └── src/app/
+├── compose.yaml
+└── compose.production.yaml
 ```
 
 ## Why one backend project initially
 
-The MVP has one deployable backend and one consistency boundary. Keeping its domain modules in one .NET project avoids project-reference choreography before there is a proven need for it. The module folders express ownership and keep API, persistence, and domain behavior discoverable without presenting a generic clean-architecture template as product value.
+The MVP has one deployable backend and one consistency boundary. Keeping its workflow definition, execution, human-task, and execution-history behavior in one .NET project avoids project-reference choreography before there is a proven need for it. The folders express ownership while the modules share a process and relational database.
 
-The Angular application remains a separate frontend project because it has a distinct toolchain and deployment asset. Purchase approval lives in `examples/` as an inspectable definition and sample data, not as the identity of the engine itself.
+The Angular application is separate because it has a distinct toolchain and deployment asset. The purchase-approval definition lives under `examples/` so it remains inspectable and versioned independently from API implementation code.
+
+The development Compose file starts PostgreSQL for host-based development. The production Compose file builds the API and web images and runs the single-host self-hosted stack. They are separate on purpose: development credentials are not production deployment settings.
 
 ## Rules for changing the layout
 
-- Keep HTTP contracts at the API boundary; do not make database entities the public API.
-- Keep each module's commands, queries, and persistence decisions close to that module.
-- Do not add a shared-kernel project until at least two modules need a stable shared concept.
+- Keep HTTP contracts at the API boundary; do not expose database entities as public responses.
+- Keep domain behavior and persistence decisions close to the module that owns them.
+- Keep request state and its execution history in one database consistency boundary for the single-instance MVP.
+- Add a worker, connector, or independently deployed service only when a scoped behavior requires it.
 - Separate a backend module into its own project only when compile-time isolation or independent ownership justifies it.
-- Add worker, connector, and deployment projects only when a scoped behavior requires them.
-
-The implementation may refine this structure when actual code exposes a better boundary. This document is a starting constraint, not a promise to preserve every folder.
+- Treat this layout as a current implementation, not a promise to preserve every folder as the product evolves.

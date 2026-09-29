@@ -1,0 +1,11 @@
+.git
+.github
+.vs
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/.angular/
+.env
+.env.*
+!.env.example

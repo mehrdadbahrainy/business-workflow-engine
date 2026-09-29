@@ -53,6 +53,28 @@ npm start
 
 Open the Angular dev-server URL shown in the terminal. Its `/api` requests proxy to the local API. In Development only, the UI sends an `X-Demo-User` identity header. Switch to `manager@example.test` in the top bar to see and decide requests waiting for the seeded approver. This demo identity handler is not enabled outside the Development environment. For a secured deployment, provide a JWT from the configured host identity provider in the **Host API token** field; the UI keeps it in the current browser tab's session storage. The project does not implement an identity-provider login flow.
 
+## Self-host with Docker Compose
+
+The production Compose stack runs PostgreSQL, the .NET API, and the Angular operations UI as separate containers. It requires an existing OIDC-compatible identity provider; the engine validates bearer tokens but does not issue them or manage user accounts.
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edit `.env` before starting the stack. Set a long random hexadecimal `POSTGRES_PASSWORD`, the issuer URL and audience accepted by your identity provider, and `PURCHASE_APPROVER_SUBJECT` to the exact `sub` value of the approver. Configure your TLS-terminating reverse proxy to forward to the web port (8080 by default).
+
+```powershell
+docker compose --env-file .env -f compose.production.yaml up --build --wait
+```
+
+Open `http://localhost:8080` (or your configured `WEB_PORT`) and enter a host-issued JWT in the **Host API token** field. The API applies EF Core migrations at startup. PostgreSQL data is retained in the `workflow-data` named volume when containers are stopped or recreated.
+
+To stop the containers while keeping stored workflow data:
+
+```powershell
+docker compose --env-file .env -f compose.production.yaml down
+```
+
 The default local database credentials in `appsettings.json` and `compose.yaml` are for development only. Configure `ConnectionStrings__WorkflowDatabase`, `Authentication__Authority`, and `Authentication__Audience` for a hosted deployment. Outside Development, the API validates JWT bearer tokens from the configured authority and uses the authenticated `sub` claim as the actor identity.
 
 ## API overview

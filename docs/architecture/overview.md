@@ -56,7 +56,7 @@ The model stores current instance state for efficient reads and keeps an append-
 - **External application:** REST API to start and query an instance.
 - **People:** Angular UI for pending approvals, request details, and execution history.
 - **Storage:** PostgreSQL for durable process state.
-- **Deployment:** one self-hosted installation for one organization in the MVP.
+- **Deployment:** one self-hosted installation for one organization in the MVP. The first packaged deployment uses Docker Compose on a single host.
 
 An outbound webhook, vendor-specific connectors, user provisioning, provider-specific SSO, and multi-tenancy are deferred. The API query is sufficient to demonstrate the initial handoff and retrieve the outcome; callback delivery can be added when a validated integration needs it.
 
