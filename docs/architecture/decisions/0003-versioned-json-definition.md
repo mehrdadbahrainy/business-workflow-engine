@@ -1,6 +1,6 @@
 # ADR 0003: Use a Small Versioned JSON Definition for the First Workflow
 
-- **Status:** Accepted for the MVP
+- **Status:** Superseded by [ADR 0006](0006-definition-driven-general-purpose-runtime.md)
 - **Date:** 2026-09-30
 
 ## Context
@@ -9,7 +9,7 @@ The runtime needs a definition revision so an instance has stable rules for its 
 
 ## Decision
 
-Represent the seeded purchase-approval definition as a versioned JSON document. Validate it against a typed schema when loading it. The MVP supports only the fields and behavior needed by this flow: definition identity and revision, approval threshold, and the designated approver subject. Persist each published revision and pin every instance to one revision.
+Historical decision: the first vertical slice represented the seeded purchase-approval definition as a versioned JSON document with purchase-specific fields. That schema is insufficient for the project's general-purpose engine direction; use ADR 0006 for the target model.
 
 The first release does not expose a general definition editor or definition-management API. The example definition is the source for the initial seeded revision.
 

@@ -1,79 +1,74 @@
-# MVP Scope
+# MVP Scope: Definition-Driven Workflow Engine
 
-**Status:** Proposed scope for the first usable vertical slice. It is derived from the purchase-request candidate and should be revised if user discovery invalidates that use case.
+**Status:** Product direction accepted; generic runtime capabilities are not yet implemented. Purchase approval is one example process, not the MVP boundary.
 
 ## MVP goal
 
-Prove that an application team can start a business request in an existing application, let it wait safely for a human decision, and inspect or retrieve its outcome without relying on a spreadsheet or manual status chasing.
+Let an application team define, publish, start, and operate different business processes without adding process-specific backend code for each one. The engine must persist execution, route data through declared steps, wait for human work, and return definition-selected outputs.
 
-The MVP is a usable, self-hostable single-organization product slice—not a general-purpose process platform.
+The MVP is a self-hostable workflow runtime with an operational interface. A visual drag-and-drop designer and an unlimited connector catalog are not required to prove the engine; JSON definitions and APIs are sufficient.
 
-## Included
+## Included engine capabilities
 
-### Start and track a request
+### Define and publish processes
 
-- Start a purchase request through a documented REST API.
-- Validate the request and return actionable validation errors.
-- Assign a stable request identifier and let the originating application query its current state and final outcome.
-- Accept an idempotency key so a retried submission does not create a second request instance.
+- Define a process using a versioned JSON document with an identifier, revision, input/output contracts, steps, routes, assignment policies, and mappings.
+- Validate the graph and all expressions before publication; reject invalid or unsupported step types with actionable errors.
+- Keep published revisions immutable and pin every instance to the revision with which it started.
+- Use a bounded, documented expression/mapping model; never execute arbitrary scripts from definitions.
 
-### Run the approval path
+### Run and inspect instances
 
-- Support one published purchase-approval workflow definition with a simple amount-threshold branch.
-- Route above-threshold requests to one designated approver.
-- Keep a request durably waiting for a decision across application restarts.
-- Let the assigned approver approve or reject and provide an optional comment.
-- Record the outcome and expose it through the request API.
+- Start any published workflow by identifier with definition-specific JSON input and an idempotency key.
+- Support start, variable assignment, exclusive conditional routing, user task, and end steps.
+- Persist current execution position, step attempts, data, task state, and append-only history so instances survive restarts and human wait periods.
+- Resume an instance on authorized user-task completion, validate the completion payload, and continue through the same pinned definition.
+- Complete with a generic lifecycle status, a definition-selected business outcome, and output JSON matching the definition's contract.
+- Query instances, current work, outputs, and execution history through a versioned API and operations UI.
 
-### Operate and understand executions
+### Demonstrate generality
 
-- Show request instances in an Angular operational interface.
-- Provide a pending-approval queue and request details with current state, responsible person, and chronological execution history.
-- Record who made an approval decision and when.
-- Show the workflow state separately from the business outcome, so an approved request is not mistaken for a fulfilled purchase. Invalid input returns a validation error before an instance is created.
+- Provide at least two meaningfully different definitions (for example, purchase approval and employee leave request) that execute through the same generic runtime.
+- Show that adding an example process changes only its definition and input/output presentation, not process-specific engine endpoints, entity columns, or branching code.
+- Keep the engine's core API and database model free of purchase-specific concepts such as currency, approval threshold, or purchase outcome.
 
-### Run locally and self-host
+## Staged after the first generic runtime
 
-- Provide one documented local deployment path suitable for evaluation and a small self-hosted installation.
-- Include a seeded purchase-approval example and sample API requests so a developer can start and inspect a full run.
-- Keep the initial scope to one organization and one workflow definition; do not imply production readiness for multi-tenant or regulated deployments.
+- Registered service/action steps with durable dispatch, idempotency, retries, and transactional outbox.
+- Timers, escalation, parallel branches and joins, cancellation/compensation, and loops after their recovery semantics are specified.
+- Visual workflow authoring, BPMN interoperability, broader identity administration, multi-tenancy, and high availability when validated use cases justify them.
 
 ## MVP acceptance evidence
 
-The MVP is successful when a reviewer can demonstrate all of the following in the running product:
+1. Publish a valid definition through the API and reject structurally invalid definitions before they can be started.
+2. Start a workflow with its own JSON contract, then retrieve the same durable instance using the returned ID.
+3. Exercise at least two distinct routes from data-driven conditions.
+4. Reach a generic user task, restart the application, and observe the same task still pending.
+5. Complete work as an authorized actor, reject an unauthorized or repeated completion, and resume at the declared next step.
+6. Reach the configured end step and retrieve its selected business outcome and mapped JSON output.
+7. Run the purchase-approval and an unrelated example definition without adding backend code or schema columns for either process.
+8. Inspect a chronological history explaining the input, steps, selected routes, work, and final output.
 
-1. Submit a valid request from an external client and receive an identifier that can be used to retrieve it.
-2. Submit the same request again with the same idempotency key and observe the original instance rather than a duplicate.
-3. Submit a request that reaches manager approval and see it in the approver's pending queue.
-4. Restart the application while the request is waiting, then observe that the request is still waiting and can still be completed.
-5. Approve or reject the request and see the actor, decision, timestamp, and resulting state in the execution history.
-6. Retrieve the final outcome through the API and see the same outcome in the operational interface.
-7. Submit a request that follows the other threshold branch and verify that it reaches the documented outcome without a manager task.
+These are product acceptance conditions. They do not authorize running automated tests unless separately requested.
 
-These are product acceptance conditions, not a request to add automated tests at this stage.
+## Product guardrails
 
-## Explicitly out of scope
+- A workflow definition is data interpreted by a fixed, versioned engine contract; it is not executable code.
+- Business input and output are definition-specific. Generic runtime tables do not encode one industry's fields.
+- Every state transition has a recoverable position, a clear cause, and a corresponding history record.
+- Definitions used by running instances cannot change underneath them.
+- Process authors choose routes and outcomes in the definition; the engine executes and records those choices.
+- The engine coordinates work but does not replace the system of record for HR, finance, procurement, CRM, or other business domains.
+- Do not claim generic behavior for a step type until validation, persistence, retry, failure, and authorization semantics are implemented.
 
-- A drag-and-drop workflow designer or a general citizen-developer builder.
-- Arbitrary workflow authoring, scripting, loops, parallel branches, or nested workflows.
-- Multiple approval levels, quorum rules, delegation, escalation, SLA calendars, and reminders.
-- A catalog of vendor-specific connectors or a replacement for procurement, ERP, or finance software.
-- Executing a purchase, creating a purchase order, or moving money.
-- AI steps, agents, chatbot features, or AI-generated workflow definitions.
-- Multi-tenancy, user provisioning, provider-specific SSO, fine-grained permission administration, and compliance certifications. The runtime still validates API bearer tokens and enforces that only the assigned subject can decide an approval.
-- Horizontal scaling claims, microservices, and a message broker before the single-instance lifecycle is understood.
+## Explicitly outside this MVP
 
-## Product and engineering guardrails
+- A no-code drag-and-drop designer.
+- Arbitrary user-supplied scripting or code plugins.
+- A promise to support every BPMN construct or every third-party connector.
+- Domain products such as procurement, HR management, payment processing, or ERP.
+- AI-generated workflows, multi-tenant SaaS, high availability, or compliance certification.
 
-- A waiting request is a normal durable state, not a long-running in-memory request.
-- Every state change visible to the user has an understandable cause and recorded history.
-- An approval decision must not be silently applied twice or accepted from an unassigned actor.
-- Workflow definitions used by running instances must not change underneath those instances. The implementation approach for this guarantee belongs to the domain and architecture stages.
-- Do not add a capability unless it is needed to satisfy this use case or a validated user need.
+## Current gap
 
-## Decisions deferred
-
-- Whether the initiating application receives outcomes only by querying the API or also through an outbound webhook.
-- How workflow-definition revisions will be managed after the seeded MVP definition.
-- How failures in external actions are surfaced and retried; no external side-effect action is required to prove this MVP.
-- The exact purchase policy and whether the threshold branch is representative of a real target team.
+The current code implements only a seeded purchase-approval path and contains purchase-specific persistence, routes, and UI. The next engineering milestone is to specify and implement the generic definition contract and execution model in [ADR 0006](../architecture/decisions/0006-definition-driven-general-purpose-runtime.md). The existing slice is an example to migrate, not proof that the generic engine already exists.

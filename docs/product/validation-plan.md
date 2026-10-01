@@ -6,7 +6,7 @@
 
 Determine whether a developer-integrated, self-hosted workflow runtime solves a recurring and costly coordination problem for a reachable group of application teams and operational users. This is problem discovery, not a product-market-fit claim or a usability study of the current implementation.
 
-Until evidence changes the current assumptions, keep purchase approval as a bounded demonstration and avoid adding general workflow authoring, connector catalogs, or AI capabilities.
+The product direction is now a definition-driven workflow engine. Discovery should test the underlying process-orchestration problem, target roles, and deployment fit; purchase approval is only one demonstration. Research can refine which generic capabilities matter first, but it should not re-scope the product back to a purchase-only implementation. Connector catalogs and AI capabilities remain outside the current scope.
 
 ## Hypotheses to examine
 
@@ -14,7 +14,7 @@ Until evidence changes the current assumptions, keep purchase approval as a boun
 2. **Application-team fit:** application teams need to coordinate those requests and find their existing application logic, workflow products, or manual handoffs insufficient for a specific reason.
 3. **Operational fit:** requesters, approvers, and operators need one durable place to act on assigned work and understand how it reached an outcome.
 4. **Deployment fit:** self-hosting, data control, or integration ownership is a meaningful requirement for the intended audience, rather than an assumption based on the project author's preferences.
-5. **First-use-case fit:** purchase approval resembles a real recurring process and exposes the right workflow primitives without taking on procurement or finance policy.
+5. **Workflow primitives:** the initial definition model can represent more than one real process while remaining understandable to authors and operators.
 
 ## Participants
 
@@ -75,9 +75,9 @@ These are directional gates for deciding what to investigate or build next; pass
 
 - **Problem:** keep the cross-boundary lifecycle problem prominent only if multiple independent participants can recount recent examples with a concrete cost or workaround. If the issue is rare or already handled adequately, narrow or replace the problem statement.
 - **Audience:** keep application teams as the primary integration audience only if they own the relevant application boundary and have a reason existing tools do not fit. Otherwise, revisit the buyer, operator, and integration surface before broadening implementation.
-- **First use case:** keep purchase approval only if real examples resemble the bounded handoff and do not require the MVP to become a procurement or finance product. Select a more representative request if evidence points elsewhere.
+- **Example processes:** use purchase approval and a second unrelated process to probe the generic model. Select examples that test different inputs, routes, human work, and outputs; neither example becomes the product boundary.
 - **Runtime versus existing tools:** document the specific unmet need against the tools participants already use. If a separate runtime adds more deployment and integration work than it removes, do not expand the engine on the basis of an abstract platform idea.
-- **Definition model:** do not add new step types or a general definition language until a second validated process requires behavior the seeded definition cannot express.
+- **Definition model:** validate whether the bounded generic definition model is understandable and expressive for the observed processes. Add step types only when a concrete process requires them and their execution semantics can be made durable and safe.
 - **Self-hosting:** retain it as a primary deployment path only when data control, identity, network, or operating requirements support that choice.
 
 After the round, write a short decision memo that updates the problem statement, target audience, first use case, MVP boundaries, and architecture decisions. Record evidence that contradicts the current direction as clearly as evidence that supports it.

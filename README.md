@@ -2,9 +2,9 @@
 
 [![Build](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/build.yml/badge.svg)](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/build.yml)
 
-An open-source, self-hostable workflow runtime for business requests that cross an application boundary and wait for a human decision. It pairs an application-facing API with an operations interface for pending approvals and request history.
+An open-source, self-hostable workflow engine for defining and running business processes. Definitions specify their input data, steps, routing rules, and outputs; running instances persist progress and expose work and execution history through an API and operations interface.
 
-**Project status: early MVP implementation.** The first purchase-approval path is implemented, but the project has not yet been validated with target users or hardened for production use.
+**Project status: early implementation.** The current runtime is a purchase-approval vertical slice and is not yet generic. The product direction is a reusable engine where purchase approval is one example definition, not a product boundary. The project has not yet been validated with target users or hardened for production use.
 
 ## What works today
 
@@ -15,7 +15,7 @@ An open-source, self-hostable workflow runtime for business requests that cross 
 - Review a personal request list, pending approval queue, and request timeline in the Angular operations UI.
 - Complete an approval or rejection and retrieve the recorded outcome.
 
-The engine currently implements this one seeded definition. It is not a general-purpose workflow language, visual designer, purchasing system, or payment processor.
+The current API and persistence model are still purchase-specific. Turning them into a definition-driven runtime is the next core engineering objective. A visual designer, purchasing system, and payment processor are not part of the engine's purpose.
 
 ## Technology
 

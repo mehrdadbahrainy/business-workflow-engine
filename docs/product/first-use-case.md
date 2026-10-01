@@ -1,6 +1,6 @@
-# First Use Case: Purchase Request Approval
+# Example Process: Purchase Request Approval
 
-**Status:** Initial vertical-slice candidate derived from the product hypothesis. Validate with people who handle this process before treating it as a real customer requirement.
+**Status:** One example definition used to validate the generic runtime. It is not the product boundary or a claim that procurement is the target market. Validate with people who handle this process before treating it as a real customer requirement.
 
 ## Scenario
 
