@@ -60,7 +60,7 @@ An append-only fact such as instance started, step entered/completed, route sele
 
 ## First generic execution slice
 
-The first definition-driven runtime should support start, variable assignment, exclusive conditional routing, user task, and end steps. It must support arbitrary JSON input and configurable mappings for task input and end output. This small set already supports distinct processes such as purchase approval, leave requests, and employee onboarding without embedding those business concepts in the engine. Service actions, timers, parallel gateways, loops, and visual authoring follow only after their durable semantics are specified.
+The first definition-driven runtime should support start, variable assignment, exclusive conditional routing, role-based user task, HTTP/REST action, and end steps. It must support arbitrary JSON input and configurable mappings for task input, action requests/responses, and end output. A web canvas authors these nodes and transitions into the versioned definition format. This set supports distinct processes such as purchase approval, leave requests, and employee onboarding without embedding those business concepts in the engine. Timers, parallel gateways, loops, and provider-specific connectors follow only after their durable semantics are specified.
 
 ## Deliberate boundaries
 

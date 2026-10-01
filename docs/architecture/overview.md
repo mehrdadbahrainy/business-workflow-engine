@@ -10,13 +10,16 @@ Let teams define and run different business processes without changing or redepl
 
 ```mermaid
 flowchart LR
-    Author[Workflow definition JSON] -->|validate / publish| Api[ASP.NET Core API]
+    Author[Workflow author] -->|design / publish| Ui[Angular workflow designer]
+    Ui -->|definition API| Api[ASP.NET Core API]
     Host[Business applications] -->|start / query / receive outcomes| Api
-    Operator[Task assignee / operator] -->|Web UI| Ui[Angular application]
+    Operator[Role assignee / operator] -->|Work UI| Ui
     Ui -->|REST API| Api
     Api --> Definitions[Definition catalog]
     Api --> Workflow[Generic execution runtime]
-    Workflow --> Tasks[Human work items]
+    Workflow --> Tasks[Role-based human work items]
+    Workflow --> Actions[HTTP / REST actions]
+    Actions --> External[External business systems]
     Workflow --> Store[(PostgreSQL)]
     Tasks --> Store
 ```
@@ -27,8 +30,8 @@ The initial deployment remains a modular monolith: one backend application, one 
 
 - **Workflow Definitions:** validated, immutable revisions containing input/output contracts, supported steps, and transition rules.
 - **Workflow Execution:** generic instance lifecycle, step execution, deterministic routing, variable/data context, and durable progress.
-- **Human Work:** generic user tasks, assignment, completion payloads, and authorization. Approval is one task pattern.
-- **Workers and Actions:** bounded, registered action types for external work, with durable attempts and retries. Arbitrary code from a definition is never executed.
+- **Human Work:** generic user tasks, workflow-defined role assignment, completion payloads, and authorization. Approval is one task pattern.
+- **Workers and Integrations:** bounded HTTP/REST actions for external systems, with durable attempts and retries. Credentials are stored separately from workflow definitions. Arbitrary code from a definition is never executed.
 - **Execution History:** append-only facts describing execution and state changes, committed consistently with those changes.
 - **HTTP API:** versioned integration surface to manage definitions, start/query instances, and complete assigned work.
 - **Identity boundary:** validate host-issued JWT bearer tokens and authorize access using authenticated identity and definition policy. Local demo identity is development-only.
@@ -37,11 +40,11 @@ These are domain boundaries, not a commitment to one project per module. They ca
 
 ## Execution path
 
-1. An administrator publishes a validated immutable definition revision.
+1. An author uses the web designer to assemble supported steps, transitions, role assignments, and integration calls, then publishes a validated immutable definition revision.
 2. A host application starts a named workflow with JSON input and an idempotency key; the runtime validates input against the definition contract.
 3. The runtime pins the instance to that revision and advances through supported steps, evaluating declared routes against instance data.
 4. At a wait point such as a user task or durable action, it commits progress and history, then releases execution capacity.
-5. A task completion or action result resumes the instance. The engine validates the payload and advances according to the same pinned definition.
+5. A role member completes a task or an external HTTP action returns; the runtime validates the result and advances according to the same pinned definition.
 6. An end step writes the definition-selected outcome and output data for retrieval or delivery to the host application.
 
 The engine must not run arbitrary scripts supplied in definitions. Conditions and mappings use a bounded, versioned expression model. Durable workers, retries, timers, and parallel execution are introduced in stages with explicit persistence and delivery semantics; they must not be simulated by long-running HTTP requests.
@@ -65,8 +68,8 @@ Identity provisioning, provider-specific SSO, multi-tenancy, a broad connector c
 
 ## Staged capability boundary
 
-- **Generic runtime foundation:** versioned JSON definitions, typed JSON input/output, start/end, user-task, variable assignment, and exclusive conditional routing. Definitions are authored and published through an API. The purchase flow is a sample.
-- **Durable integration:** registered service actions, durable worker queue, bounded retries, and an outbox for callbacks/webhooks.
-- **Later, driven by concrete use cases:** timers, parallel branches and joins, cancellation/compensation, and visual authoring.
+- **Generic runtime foundation:** versioned JSON definitions, typed JSON input/output, start/end, role-based user-task, variable assignment, exclusive conditional routing, and HTTP/REST actions. Definitions are authored through the web designer and published through an API. The purchase flow is a sample.
+- **Integration reliability:** durable worker queue, bounded retries, secret-safe credentials, inbound webhooks, and an outbox for outbound callbacks.
+- **Later, driven by concrete use cases:** provider-specific connectors, timers, parallel branches and joins, and cancellation/compensation.
 
-Each stage must keep definitions portable, execution history explainable, and active instances pinned to immutable revisions. See [ADR 0006](decisions/0006-definition-driven-general-purpose-runtime.md).
+Each stage must keep definitions portable, execution history explainable, and active instances pinned to immutable revisions. See [ADR 0006](decisions/0006-definition-driven-general-purpose-runtime.md) and [ADR 0007](decisions/0007-web-authoring-roles-and-http-integrations.md).

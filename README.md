@@ -2,7 +2,7 @@
 
 [![Build](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/build.yml/badge.svg)](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/build.yml)
 
-An open-source, self-hostable workflow engine for defining and running business processes. Definitions specify their input data, steps, routing rules, and outputs; running instances persist progress and expose work and execution history through an API and operations interface.
+An open-source, self-hostable workflow engine for defining and running business processes. The product direction includes a web workflow designer, role-based work routing, and HTTP integrations with external systems. Definitions specify their inputs, steps, routes, and outputs; instances persist progress and execution history.
 
 **Project status: early implementation.** The current runtime is a purchase-approval vertical slice and is not yet generic. The product direction is a reusable engine where purchase approval is one example definition, not a product boundary. The project has not yet been validated with target users or hardened for production use.
 

@@ -6,13 +6,14 @@
 
 Let an application team define, publish, start, and operate different business processes without adding process-specific backend code for each one. The engine must persist execution, route data through declared steps, wait for human work, and return definition-selected outputs.
 
-The MVP is a self-hostable workflow runtime with an operational interface. A visual drag-and-drop designer and an unlimited connector catalog are not required to prove the engine; JSON definitions and APIs are sufficient.
+The MVP is a self-hostable workflow engine with a web authoring interface and an operational interface. Users can define workflows in the browser, set routing and outputs, assign work to distinct roles, and call other systems through a generic HTTP/REST integration step. A broad vendor connector catalog is not required for the first usable version.
 
 ## Included engine capabilities
 
 ### Define and publish processes
 
 - Define a process using a versioned JSON document with an identifier, revision, input/output contracts, steps, routes, assignment policies, and mappings.
+- Create and edit definitions in the web application using a visual node-and-edge workflow canvas; authors should not need to hand-edit JSON for normal workflows.
 - Validate the graph and all expressions before publication; reject invalid or unsupported step types with actionable errors.
 - Keep published revisions immutable and pin every instance to the revision with which it started.
 - Use a bounded, documented expression/mapping model; never execute arbitrary scripts from definitions.
@@ -20,7 +21,10 @@ The MVP is a self-hostable workflow runtime with an operational interface. A vis
 ### Run and inspect instances
 
 - Start any published workflow by identifier with definition-specific JSON input and an idempotency key.
-- Support start, variable assignment, exclusive conditional routing, user task, and end steps.
+- Support start, variable assignment, exclusive conditional routing, role-based user task, HTTP/REST action, and end steps.
+- Configure distinct workflow roles and map authenticated identity claims to role membership. Enforce role membership on task listing and completion.
+- Configure HTTP method, URL, headers, and request/response mappings for service actions. Keep credentials out of definition JSON and expose them through a secret-safe configuration mechanism.
+- Start workflows through the authenticated API. Add a secured inbound webhook trigger and outbound callbacks after the first HTTP action semantics are reliable.
 - Persist current execution position, step attempts, data, task state, and append-only history so instances survive restarts and human wait periods.
 - Resume an instance on authorized user-task completion, validate the completion payload, and continue through the same pinned definition.
 - Complete with a generic lifecycle status, a definition-selected business outcome, and output JSON matching the definition's contract.
@@ -28,26 +32,27 @@ The MVP is a self-hostable workflow runtime with an operational interface. A vis
 
 ### Demonstrate generality
 
-- Provide at least two meaningfully different definitions (for example, purchase approval and employee leave request) that execute through the same generic runtime.
+- Provide at least two meaningfully different definitions (for example, purchase approval and employee leave request) that execute through the same generic runtime, designer, role model, and integration step.
 - Show that adding an example process changes only its definition and input/output presentation, not process-specific engine endpoints, entity columns, or branching code.
 - Keep the engine's core API and database model free of purchase-specific concepts such as currency, approval threshold, or purchase outcome.
 
 ## Staged after the first generic runtime
 
-- Registered service/action steps with durable dispatch, idempotency, retries, and transactional outbox.
+- Provider-specific connector catalog and reusable integration marketplace beyond generic HTTP/REST.
 - Timers, escalation, parallel branches and joins, cancellation/compensation, and loops after their recovery semantics are specified.
 - Visual workflow authoring, BPMN interoperability, broader identity administration, multi-tenancy, and high availability when validated use cases justify them.
 
 ## MVP acceptance evidence
 
-1. Publish a valid definition through the API and reject structurally invalid definitions before they can be started.
+1. Create, edit, validate, and publish a definition through the web designer without hand-editing JSON; reject structurally invalid graphs before publication.
 2. Start a workflow with its own JSON contract, then retrieve the same durable instance using the returned ID.
 3. Exercise at least two distinct routes from data-driven conditions.
-4. Reach a generic user task, restart the application, and observe the same task still pending.
-5. Complete work as an authorized actor, reject an unauthorized or repeated completion, and resume at the declared next step.
-6. Reach the configured end step and retrieve its selected business outcome and mapped JSON output.
-7. Run the purchase-approval and an unrelated example definition without adding backend code or schema columns for either process.
-8. Inspect a chronological history explaining the input, steps, selected routes, work, and final output.
+4. Route work to different configured roles and verify only members of each role can see and complete its tasks.
+5. Reach a user task, restart the application, and observe the same task still pending.
+6. Call an external HTTP endpoint using mapped request data and a configured credential reference; inspect the recorded result and retry state.
+7. Reach the configured end step and retrieve its selected business outcome and mapped JSON output.
+8. Run the purchase-approval and an unrelated example definition without adding backend code or schema columns for either process.
+9. Inspect a chronological history explaining the input, steps, selected routes, work, integration calls, and final output.
 
 These are product acceptance conditions. They do not authorize running automated tests unless separately requested.
 
@@ -63,7 +68,7 @@ These are product acceptance conditions. They do not authorize running automated
 
 ## Explicitly outside this MVP
 
-- A no-code drag-and-drop designer.
+- A broad catalog of prebuilt vendor connectors.
 - Arbitrary user-supplied scripting or code plugins.
 - A promise to support every BPMN construct or every third-party connector.
 - Domain products such as procurement, HR management, payment processing, or ERP.
@@ -71,4 +76,4 @@ These are product acceptance conditions. They do not authorize running automated
 
 ## Current gap
 
-The current code implements only a seeded purchase-approval path and contains purchase-specific persistence, routes, and UI. The next engineering milestone is to specify and implement the generic definition contract and execution model in [ADR 0006](../architecture/decisions/0006-definition-driven-general-purpose-runtime.md). The existing slice is an example to migrate, not proof that the generic engine already exists.
+The current code implements only a seeded purchase-approval path and contains purchase-specific persistence, routes, and UI. The next engineering milestones are the definition contract and generic runtime, followed by the browser designer, workflow roles, and HTTP integration step in [ADR 0006](../architecture/decisions/0006-definition-driven-general-purpose-runtime.md) and [ADR 0007](../architecture/decisions/0007-web-authoring-roles-and-http-integrations.md). The existing slice is an example to migrate, not proof that these capabilities already exist.

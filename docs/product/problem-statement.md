@@ -52,7 +52,7 @@ The initial product is not intended to be:
 - a replacement for CRM, ERP, procurement, or finance systems;
 - a general-purpose integration catalog or an automation product that promises to connect everything;
 - a task manager detached from an executable business process;
-- a no-code workflow designer or an n8n clone;
+- an unlimited automation catalog or an n8n clone;
 - an AI-agent framework or a chatbot;
 - a showcase for microservices or architectural patterns.
 

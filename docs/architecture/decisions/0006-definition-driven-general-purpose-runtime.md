@@ -18,12 +18,17 @@ The first generic execution slice supports:
 1. **Start:** validate arbitrary definition-specific JSON input.
 2. **Set variables:** apply deterministic, validated data mappings.
 3. **Exclusive route:** choose one outgoing transition by evaluating bounded conditions over the instance data.
-4. **User task:** persist and expose configurable assigned work; task completion supplies definition-specific data and resumes the instance.
-5. **End:** persist lifecycle completion, a definition-selected business outcome, and output data conforming to the definition's output contract.
+4. **Role-based user task:** persist work assigned to a configured workflow role; authorize completion through identity-provider claims and resume with definition-specific data.
+5. **HTTP/REST action:** call an external system through a durable worker using mapped request/response data and a credential reference. Record attempts and enforce timeout and bounded retry policy.
+6. **End:** persist lifecycle completion, a definition-selected business outcome, and output data conforming to the definition's output contract.
 
 Definitions are submitted and published through an API as JSON. The engine validates graph connectivity, step configuration, data contracts, references, expressions, and output mappings before publication. Published revisions are immutable. Running a definition never evaluates arbitrary scripts, C#, JavaScript, or shell commands supplied by users. Approval is modeled as a user task and sample process, not as a built-in engine concept.
 
+The Angular web application provides the workflow authoring experience: users visually create and connect supported nodes, configure roles, routes, data mappings, and HTTP actions, validate, and publish. Definitions remain portable JSON internally, but ordinary authors are not expected to edit JSON directly. HTTP credentials are stored in deployment-managed secrets and referenced by name; secret values are never embedded in a definition or shown after entry.
+
 The current purchase-specific implementation is a transitional vertical slice. It should be migrated to generic instance, step execution, work-item, and definition models. Keep it only as a compatibility example during the transition; new engine behavior must not add purchase-specific columns or routes.
+
+The authoring experience is part of the intended product: users define and publish workflows in the web application. Human steps can target workflow-defined roles, and service steps can communicate with external systems through configured integrations. The first connector is generic HTTP/REST; provider-specific connector catalogs are not an MVP requirement.
 
 ## Options considered
 
@@ -47,9 +52,10 @@ The current purchase-specific implementation is a transitional vertical slice. I
 1. Specify and validate the versioned definition document and safe expression subset.
 2. Replace purchase-specific persistence with generic definitions, instances, step executions, user tasks, and events.
 3. Implement generic start, deterministic runner, user-task wait/resume, routing, and end-output handling.
-4. Expose definition publish/start/query/work-item APIs and adapt the UI.
-5. Convert purchase approval and a second unrelated process into example definitions; prove both run through the same engine without process-specific backend code.
+4. Expose definition publish/start/query/work-item APIs and add a visual web workflow designer for the supported step types.
+5. Add workflow roles mapped to authenticated identity claims and an HTTP service step with secret-safe credential handling.
+6. Convert purchase approval and a second unrelated process into example definitions; prove both run through the same engine without process-specific backend code.
 
 ## Revisit when
 
-The supported graph/expression contract cannot safely represent validated user processes, or standards-based definition exchange and tooling are proven adoption requirements. Revisit individual step types when a real use case establishes their execution and failure semantics.
+The supported graph/expression contract cannot safely represent validated user processes, or standards-based definition exchange and tooling are proven adoption requirements. Revisit individual step types and connector types when a real use case establishes their execution and failure semantics.
