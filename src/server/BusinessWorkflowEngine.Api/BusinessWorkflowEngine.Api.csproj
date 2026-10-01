@@ -18,6 +18,8 @@
 
   <ItemGroup>
     <None Include="..\..\..\examples\purchase-approval\definition.json" Link="Definitions\purchase-approval-v1.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\examples\purchase-approval\workflow.json" Link="Definitions\purchase-approval-workflow-v1.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\examples\employee-leave\workflow.json" Link="Definitions\employee-leave-workflow-v1.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

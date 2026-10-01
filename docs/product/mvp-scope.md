@@ -1,6 +1,6 @@
 # MVP Scope: Definition-Driven Workflow Engine
 
-**Status:** Product direction accepted; generic runtime capabilities are not yet implemented. Purchase approval is one example process, not the MVP boundary.
+**Status:** Product direction accepted; the first generic runtime, browser designer, role tasks, and HTTP connections are implemented. Hardening and acceptance evidence remain. Purchase approval is one example process, not the MVP boundary.
 
 ## MVP goal
 
@@ -23,7 +23,7 @@ The MVP is a self-hostable workflow engine with a web authoring interface and an
 - Start any published workflow by identifier with definition-specific JSON input and an idempotency key.
 - Support start, variable assignment, exclusive conditional routing, role-based user task, HTTP/REST action, and end steps.
 - Configure distinct workflow roles and map authenticated identity claims to role membership. Enforce role membership on task listing and completion.
-- Configure HTTP method, URL, headers, and request/response mappings for service actions. Keep credentials out of definition JSON and expose them through a secret-safe configuration mechanism.
+- Configure HTTP method, connected system, relative path, query/body mappings, and response handling for service actions. Keep credentials out of definition JSON and expose them through encrypted connection records.
 - Start workflows through the authenticated API. Add a secured inbound webhook trigger and outbound callbacks after the first HTTP action semantics are reliable.
 - Persist current execution position, step attempts, data, task state, and append-only history so instances survive restarts and human wait periods.
 - Resume an instance on authorized user-task completion, validate the completion payload, and continue through the same pinned definition.
@@ -40,7 +40,7 @@ The MVP is a self-hostable workflow engine with a web authoring interface and an
 
 - Provider-specific connector catalog and reusable integration marketplace beyond generic HTTP/REST.
 - Timers, escalation, parallel branches and joins, cancellation/compensation, and loops after their recovery semantics are specified.
-- Visual workflow authoring, BPMN interoperability, broader identity administration, multi-tenancy, and high availability when validated use cases justify them.
+- BPMN interoperability, broader identity administration, multi-tenancy, and high availability when validated use cases justify them.
 
 ## MVP acceptance evidence
 
@@ -76,4 +76,4 @@ These are product acceptance conditions. They do not authorize running automated
 
 ## Current gap
 
-The current code implements only a seeded purchase-approval path and contains purchase-specific persistence, routes, and UI. The next engineering milestones are the definition contract and generic runtime, followed by the browser designer, workflow roles, and HTTP integration step in [ADR 0006](../architecture/decisions/0006-definition-driven-general-purpose-runtime.md) and [ADR 0007](../architecture/decisions/0007-web-authoring-roles-and-http-integrations.md). The existing slice is an example to migrate, not proof that these capabilities already exist.
+The generic designer, schema-driven role-task forms, HTTP connections, and durable runtime paths are implemented. Validation in this environment has not exercised migration, role authorization, execution recovery, or HTTP retry behavior against a live PostgreSQL deployment and identity provider. Integration encryption-key rotation also requires an operator procedure; credentials must be re-entered after a key change. The older purchase-specific API and database tables remain as a compatibility path and are not used by generic workflow execution. These operational gaps are tracked against [ADR 0006](../architecture/decisions/0006-definition-driven-general-purpose-runtime.md) and [ADR 0007](../architecture/decisions/0007-web-authoring-roles-and-http-integrations.md).

@@ -1,78 +1,203 @@
-<div class="shell">
+<div class="app-shell">
   <header class="topbar">
-    <a class="brand" href="/" aria-label="Business Workflow Engine home"><span class="brand-mark">W</span><span>Business Workflow Engine<small>Operations console</small></span></a>
-    <div class="identity"><span class="online"></span><label for="actor">Subject (Development)</label><input id="actor" [(ngModel)]="actor" (keyup.enter)="switchActor()"><button class="quiet" (click)="switchActor()">Switch</button><input aria-label="Host API access token" type="password" placeholder="Host API token" [(ngModel)]="accessToken" (blur)="saveAccessToken()"></div>
+    <a class="brand" href="/" aria-label="Workflow Engine home"><span class="brand-mark">W</span><span>Flowforge<small>Workflow Engine</small></span></a>
+    <nav aria-label="Main navigation">
+      <button [class.active]="activeTab === 'workflows'" (click)="activeTab = 'workflows'">Workflows</button>
+      <button [class.active]="activeTab === 'integrations'" (click)="activeTab = 'integrations'; refreshIntegrations()">Connections</button>
+      <button [class.active]="activeTab === 'instances'" (click)="activeTab = 'instances'; refreshInstances()">Instances</button>
+      <button [class.active]="activeTab === 'work'" (click)="activeTab = 'work'; refreshWorkItems()">My work</button>
+    </nav>
+    <details class="identity">
+      <summary>{{ actor }}</summary>
+      <div class="identity-menu">
+        <label>Development subject<input [(ngModel)]="actor" name="actor"></label>
+        <label>Development roles<input [(ngModel)]="rolesText" name="roles" placeholder="manager,hr,team-lead"></label>
+        <label>Host API token<input type="password" [(ngModel)]="accessToken" name="token" (blur)="saveAccessToken()"></label>
+        <button class="button secondary" (click)="switchActor()">Apply identity</button>
+      </div>
+    </details>
   </header>
 
   <main>
-    <section class="welcome">
-      <div><p class="eyebrow">PURCHASE APPROVAL · WORKSPACE</p><h1>Requests move forward.</h1><p class="subhead">Start a purchase request, review assigned approvals, and see each step in its history.</p></div>
-      <button class="refresh" (click)="refresh()" aria-label="Refresh workspace">↻ <span>Refresh</span></button>
-    </section>
+    <div class="alerts">
+      @if (error) { <div class="alert error" role="alert">{{ error }}</div> }
+      @if (success) { <div class="alert success" role="status">{{ success }}</div> }
+    </div>
 
-    @if (error) { <div class="alert error" role="alert">{{ error }}</div> }
-    @if (success) { <div class="alert success" role="status">{{ success }}</div> }
+    @if (activeTab === 'workflows') {
+      <section class="page-heading">
+        <div><p class="eyebrow">DEFINE AND RUN</p><h1>Workflows</h1><p>Design business processes, assign work to roles, and connect external systems.</p></div>
+        <button class="button primary" (click)="newWorkflow()">ï¼‹ New workflow</button>
+      </section>
+      <section class="workflow-grid">
+        @for (definition of definitions; track definition.name) {
+          <article class="workflow-card">
+            <div class="card-symbol">â†—</div>
+            <div class="card-title"><h2>{{ definition.title }}</h2><span class="status" [class.published]="isPublished(definition)">{{ definition.status }}</span></div>
+            <p>{{ definition.description || 'No description yet.' }}</p>
+            <div class="card-meta"><code>{{ definition.name }}</code><span>Revision {{ definition.revision }}</span></div>
+            <div class="card-actions">
+              @if (isPublished(definition)) { <button class="button primary" (click)="startWorkflow(definition); activeTab = 'instances'">Start workflow</button> }
+              <button class="button secondary" (click)="editWorkflow(definition)">{{ isPublished(definition) ? 'Edit new revision' : 'Continue editing' }}</button>
+              <button class="icon-button" title="Duplicate workflow" (click)="cloneWorkflow(definition)">â§‰</button>
+            </div>
+          </article>
+        } @empty {
+          <div class="empty-state"><div class="empty-icon">âŒ˜</div><h2>No workflows yet</h2><p>Create a definition, add steps and routes, then publish it for people to run.</p><button class="button primary" (click)="newWorkflow()">Create a workflow</button></div>
+        }
+      </section>
+      <section class="example-note"><strong>Example definitions</strong><span>Purchase approval and employee leave show the same engine running different processes with different roles and outcomes.</span></section>
+    }
 
-    <section class="stats" aria-label="Workspace summary">
-      <article class="stat"><span class="stat-icon indigo">↗</span><div><small>My requests</small><strong>{{ requests.length }}</strong></div></article>
-      <article class="stat"><span class="stat-icon amber">⌛</span><div><small>Waiting on me</small><strong>{{ tasks.length }}</strong></div></article>
-      <article class="stat"><span class="stat-icon green">✓</span><div><small>Completed</small><strong>{{ requests.filter(r => r.status === 'completed').length }}</strong></div></article>
-    </section>
+    @if (activeTab === 'designer') {
+      <section class="page-heading designer-heading">
+        <div><p class="eyebrow">WORKFLOW DESIGNER Â· {{ editorMode === 'new' ? 'NEW DEFINITION' : 'REVISION ' + definitionDraft.revision }}</p><h1>{{ definitionDraft.title || 'Untitled workflow' }}</h1><p>Arrange steps, set routes, and publish a versioned process.</p></div>
+        <div class="heading-actions"><button class="button secondary" (click)="activeTab = 'workflows'">Cancel</button><button class="button secondary" [disabled]="busy" (click)="saveDraft()">Save draft</button><button class="button primary" [disabled]="busy" (click)="publishDraft()">{{ busy ? 'Savingâ€¦' : 'Validate and publish' }}</button></div>
+      </section>
 
-    <section class="columns">
-      <div class="main-column">
-        <section class="panel">
-          <div class="panel-heading"><div><p class="eyebrow">INTEGRATED REQUEST</p><h2>Start a purchase request</h2></div><span class="tag">Rule · $1,000</span></div>
-          <form class="request-form" (ngSubmit)="createRequest()">
-            <label>Reference<input name="reference" [(ngModel)]="form.requesterReference" required maxlength="100" placeholder="e.g. REQ-1002"></label>
-            <label>Description<input name="description" [(ngModel)]="form.description" required maxlength="500" placeholder="What are you purchasing?"></label>
-            <div class="form-row"><label>Amount (USD)<input name="amount" type="number" [(ngModel)]="form.amount" required min="0.01" step="0.01"></label><label>Currency<input value="USD" disabled aria-label="Currency USD"></label></div>
-            <button class="primary" type="submit" [disabled]="busy">{{ busy ? 'Starting…' : 'Start request' }} <span>→</span></button>
-            <p class="form-note">Requests over $1,000 wait for <strong>manager@example.test</strong>.</p>
-          </form>
-        </section>
+      <section class="designer-layout">
+        <div class="designer-main">
+          <article class="panel definition-settings">
+            <div class="section-heading"><div><h2>Definition</h2><p>Identity and data contracts</p></div><span class="version-tag">v{{ definitionDraft.revision }}</span></div>
+            <div class="settings-grid">
+              <label>Workflow name <input [(ngModel)]="definitionDraft.name" name="definition-name" pattern="[a-z][a-z0-9-]{0,63}" [disabled]="editorMode === 'edit'"><small>Stable id, lowercase letters, digits and hyphens.</small></label>
+              <label>Display title <input [(ngModel)]="definitionDraft.title" name="definition-title" maxlength="160"></label>
+              <label class="wide">Description <input [(ngModel)]="definitionDraft.description" name="definition-description" maxlength="500" placeholder="What does this process do?"></label>
+            </div>
+          </article>
 
-        <section class="panel list-panel">
-          <div class="panel-heading"><div><p class="eyebrow">TRACKING</p><h2>My requests</h2></div><span class="count">{{ requests.length }} total</span></div>
-          @if (requests.length === 0) { <div class="empty">No requests yet. Start one above to see its progress.</div> }
-          @for (request of requests; track request.id) {
-            <button class="request-row" [class.selected]="selected?.request?.id === request.id" (click)="open(request.id)">
-              <span class="request-symbol">▤</span><span class="request-info"><strong>{{ request.description }}</strong><small>{{ request.requesterReference }} · {{ request.createdAt | date:'mediumDate' }}</small></span>
-              <span class="amount">{{ request.amount | currency:request.currency:'symbol':'1.0-2' }}</span><span class="status" [class.waiting]="request.status === 'awaiting-approval'" [class.done]="request.outcome === 'approved' || request.outcome === 'auto-approved'" [class.rejected]="request.outcome === 'rejected'">{{ request.outcome ?? request.status }}</span><span class="chevron">›</span>
-            </button>
-          }
-        </section>
-      </div>
+          <article class="panel schema-panel">
+            <div class="section-heading"><div><h2>Input and output</h2><p>Fields available to route conditions and the final result</p></div></div>
+            <div class="schema-columns">
+              <div class="schema-editor"><div class="subheading"><strong>Start input</strong><button class="text-button" (click)="addField('input')">ï¼‹ Add field</button></div>
+                @for (field of inputFields; track $index; let i = $index) {
+                  <div class="field-row"><input [(ngModel)]="field.name" [name]="'input-field-' + i" placeholder="field name"><select [(ngModel)]="field.type" [name]="'input-type-' + i"><option value="string">Text</option><option value="number">Number</option><option value="integer">Whole number</option><option value="boolean">Yes / no</option></select><label class="required-check"><input type="checkbox" [(ngModel)]="field.required" [name]="'input-required-' + i"> Required</label><button class="icon-button danger" (click)="removeField('input', i)">Ã—</button></div>
+                } @empty { <div class="muted-empty">No input fields. Add fields your process needs.</div> }
+              </div>
+              <div class="schema-editor"><div class="subheading"><strong>End output</strong><button class="text-button" (click)="addField('output')">ï¼‹ Add field</button></div>
+                @for (field of outputFields; track $index; let i = $index) {
+                  <div class="field-row"><input [(ngModel)]="field.name" [name]="'output-field-' + i" placeholder="field name"><select [(ngModel)]="field.type" [name]="'output-type-' + i"><option value="string">Text</option><option value="number">Number</option><option value="integer">Whole number</option><option value="boolean">Yes / no</option></select><label class="required-check"><input type="checkbox" [(ngModel)]="field.required" [name]="'output-required-' + i"> Required</label><button class="icon-button danger" (click)="removeField('output', i)">Ã—</button></div>
+                } @empty { <div class="muted-empty">No output fields. Add the result the caller needs.</div> }
+              </div>
+            </div>
+          </article>
 
-      <aside class="side-column">
-        <section class="panel approvals-panel">
-          <div class="panel-heading"><div><p class="eyebrow">YOUR QUEUE</p><h2>Pending approvals</h2></div><span class="badge">{{ tasks.length }}</span></div>
-          @if (tasks.length === 0) { <div class="empty compact">Nothing waiting on you right now.</div> }
-          @for (task of tasks; track task.id) {
-            <article class="task-card">
-              <div class="task-top"><span class="status waiting">Needs review</span><span class="task-date">{{ task.createdAt | date:'mediumDate' }}</span></div>
-              <h3>{{ task.request.description }}</h3><p>{{ task.request.requesterReference }} · {{ task.request.amount | currency:task.request.currency:'symbol':'1.0-2' }}</p>
-              <textarea [(ngModel)]="decisionComments[task.id]" maxlength="1000" rows="2" placeholder="Decision comment (optional)"></textarea>
-              <button class="text-link" (click)="open(task.workflowInstanceId)">View request history <span>→</span></button>
-              <div class="task-actions"><button class="approve" (click)="decide(task, 'approve')">Approve</button><button class="reject" (click)="decide(task, 'reject')">Reject</button></div>
-            </article>
-          }
-        </section>
+          <article class="panel roles-panel">
+            <div class="section-heading"><div><h2>Workflow roles</h2><p>Task assignments use role claims from your identity provider.</p></div><button class="button secondary small" (click)="addRole()">ï¼‹ Add role</button></div>
+            <div class="role-list">
+              @for (role of definitionDraft.roles; track $index; let i = $index) {
+                <div class="role-row"><span class="role-mark">â™™</span><input [(ngModel)]="role.id" [name]="'role-id-' + i" placeholder="role-id"><input [(ngModel)]="role.name" [name]="'role-name-' + i" placeholder="Display name"><button class="icon-button danger" (click)="removeRole(i)">Ã—</button></div>
+              } @empty { <p class="muted-empty">Add roles such as manager, finance, or HR, then map those roles to identity-provider claims.</p> }
+            </div>
+          </article>
 
-        <section class="panel history-panel">
-          <div class="panel-heading"><div><p class="eyebrow">AUDIT TRAIL</p><h2>{{ selected ? 'Request history' : 'Activity' }}</h2></div>@if (selected) { <button class="quiet" (click)="selected = null">Clear</button> }</div>
-          @if (!selected) { <div class="empty compact">Select a request to inspect its recorded steps.</div> }
-          @if (selected) {
-            <div class="history-request"><strong>{{ selected.request.description }}</strong><small>{{ selected.request.requesterReference }} · {{ selected.request.status }}</small></div>
-            <ol class="timeline">
-              @for (event of selected.events; track event.occurredAt + event.type) {
-                <li><span class="timeline-dot"></span><div><strong>{{ event.type.replaceAll('-', ' ') }}</strong><small>{{ event.actorSubject }}</small>@if (eventSummary(event.data); as summary) { <small class="event-summary">{{ summary }}</small> }<time>{{ event.occurredAt | date:'short' }}</time></div></li>
+          <article class="panel canvas-panel">
+            <div class="section-heading"><div><h2>Process flow</h2><p>Connect steps by selecting the next node. Conditional gateways choose one matching route.</p></div></div>
+            <div class="node-toolbar">
+              <button (click)="addNode('set')">ï¼‹ Set data</button><button (click)="addNode('gateway')">ï¼‹ Condition</button><button (click)="addNode('userTask')">ï¼‹ Role task</button><button (click)="addNode('http')">ï¼‹ HTTP call</button><button (click)="addNode('end')">ï¼‹ End</button>
+            </div>
+            <div class="flow-canvas">
+              @for (node of definitionDraft.nodes; track node.id; let i = $index) {
+                <article class="node-card" [class.gateway-node]="node.type === 'gateway'" [class.task-node]="node.type === 'userTask'" [class.integration-node]="node.type === 'http'" [class.end-node]="node.type === 'end'">
+                  <div class="node-head"><span class="node-number">{{ i + 1 }}</span><span class="node-type">{{ nodeLabel(node.type) }}</span><code>{{ node.id }}</code>@if (node.type !== 'start' && node.type !== 'end') { <button class="icon-button danger" (click)="removeNode(node)" title="Remove step">Ã—</button> }</div>
+                  <div class="node-body">
+                    @if (node.type === 'start') { <p class="node-description">Workflow starts when an application submits data matching the input contract.</p> }
+                    @if (node.type === 'set') { <label>Set variables as a mapping object<textarea rows="4" [ngModel]="mappingText(node, 'values')" (ngModelChange)="setMappingText(node, 'values', $event)" [name]="node.id + '-values'"></textarea></label><small>Example: {{ '{ "amount": "$.input.total" }' }}</small>@if (node.config['valuesError']) { <small class="field-error">{{ node.config['valuesError'] }}</small> } }
+                    @if (node.type === 'gateway') {
+                      <div class="route-list"><strong>Routes</strong>
+                        @for (transition of node.transitions; track $index; let j = $index) {
+                          <div class="route-row"><div class="route-condition"><select [ngModel]="transition.when ? 'conditional' : 'default'" (ngModelChange)="setConditionMode(transition, $event)" [name]="node.id + '-mode-' + j"><option value="conditional">If</option><option value="default">Otherwise</option></select>
+                            @if (transition.when; as condition) { <input [(ngModel)]="condition.path" [name]="node.id + '-path-' + j" placeholder="$.input.amount"><select [(ngModel)]="condition.operator" [name]="node.id + '-operator-' + j"><option value="eq">equals</option><option value="ne">does not equal</option><option value="gt">greater than</option><option value="gte">at least</option><option value="lt">less than</option><option value="lte">at most</option><option value="contains">contains</option></select><input [ngModel]="conditionValueText(node, j, transition)" (ngModelChange)="setConditionValue(node, j, transition, $event)" [name]="node.id + '-value-' + j" placeholder="value"> }
+                          </div><label>Then go to<select [(ngModel)]="transition.to" [name]="node.id + '-target-' + j">@for (target of transitionTargetNames(); track target) { <option [value]="target">{{ target }}</option> }</select></label><button class="icon-button danger" (click)="removeTransition(node, j)">Ã—</button></div>
+                        }
+                      </div><button class="text-button" (click)="addTransition(node)">ï¼‹ Add route</button>
+                    }
+                    @if (node.type === 'userTask') {
+                      <div class="node-config-grid"><label>Task title<input [(ngModel)]="node.config['title']" [name]="node.id + '-title'"></label><label>Assigned role<select [(ngModel)]="node.config['role']" [name]="node.id + '-role'"><option value="">Select a role</option>@for (role of definitionDraft.roles; track role.id) { <option [value]="role.id">{{ role.name }} ({{ role.id }})</option> }</select></label></div>
+                      <label>Task details mapping<textarea rows="3" [ngModel]="mappingText(node, 'input')" (ngModelChange)="setMappingText(node, 'input', $event)" [name]="node.id + '-task-input'"></textarea></label>
+                    }
+                    @if (node.type === 'http') {
+                      <div class="node-config-grid"><label>Method<select [(ngModel)]="node.config['method']" [name]="node.id + '-method'"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></label><label>Connected system<select [(ngModel)]="node.config['integrationKey']" [name]="node.id + '-integration'"><option value="">Select a connection</option>@for (integration of integrations; track integration.key) { <option [value]="integration.key">{{ integration.name }} Â· {{ integration.key }}</option> }</select></label></div>
+                      <label>Relative API path<input [(ngModel)]="node.config['path']" [name]="node.id + '-path'" placeholder="/v1/requests"></label>
+                      <label>Request body mapping<textarea rows="3" [ngModel]="mappingText(node, 'request')" (ngModelChange)="setMappingText(node, 'request', $event)" [name]="node.id + '-request'"></textarea></label><small>The destination and encrypted credential come from Connections. Hostnames must be allowed by the deployment operator.</small>
+                      @if (node.config['method'] === 'GET') { <label>Query parameter mapping<textarea rows="2" [ngModel]="mappingText(node, 'query')" (ngModelChange)="setMappingText(node, 'query', $event)" [name]="node.id + '-query'"></textarea></label> }
+                    }
+                    @if (node.type === 'end') {
+                      <label>Business outcome<input [(ngModel)]="node.config['outcome']" [name]="node.id + '-outcome'" placeholder="approved, rejected, completed"></label>
+                      <label>Output mapping<textarea rows="4" [ngModel]="mappingText(node, 'output')" (ngModelChange)="setMappingText(node, 'output', $event)" [name]="node.id + '-output'"></textarea></label>
+                    }
+                  </div>
+                  @if (node.type !== 'end') {
+                    <div class="node-transition">@if (node.type !== 'gateway') { <label>Next step<select [(ngModel)]="node.transitions[0].to" [name]="node.id + '-next'">@for (target of transitionTargetNames(); track target) { @if (target !== node.id) { <option [value]="target">{{ target }}</option> } }</select></label> }</div>
+                  }
+                </article>
+                @if (i < definitionDraft.nodes.length - 1) { <div class="flow-connector" aria-hidden="true"><span>â†“</span></div> }
               }
-            </ol>
-          }
-        </section>
-      </aside>
-    </section>
-    <footer><span>Business Workflow Engine · early access</span><span>Purchase approval · definition v1</span></footer>
+            </div>
+          </article>
+        </div>
+        <aside class="designer-aside">
+          <section class="panel help-panel"><h2>How roles work</h2><p>Each user task targets one workflow role. In production, map identity-provider role claims to these role IDs. A person only sees work for roles in their token.</p><h3>Condition paths</h3><p>Use paths such as <code>$.input.amount</code>, <code>$.variables.approver</code>, or <code>$.lastTask.decision</code>.</p><h3>HTTP integrations</h3><p>Use an HTTPS endpoint. Configure allowed hostnames and credential values in the deployment environment; put only the credential key in this definition.</p></section>
+          <section class="panel help-panel"><h2>Versioning</h2><p>Publishing creates an immutable revision. Running instances continue with their original definition while you edit and publish a newer revision.</p></section>
+        </aside>
+      </section>
+    }
+
+    @if (activeTab === 'integrations') {
+      <section class="page-heading"><div><p class="eyebrow">EXTERNAL SYSTEMS</p><h1>Connections</h1><p>Configure HTTPS endpoints and credentials once, then reuse them in workflow HTTP steps.</p></div><button class="button primary" (click)="newIntegration()">ï¼‹ New connection</button></section>
+      <section class="integration-layout">
+        <article class="panel integration-list"><div class="section-heading"><div><h2>Configured systems</h2><p>Credentials are encrypted at rest and never returned by the API.</p></div></div>
+          @for (connection of integrations; track connection.key) { <div class="integration-row"><span class="integration-icon">â‡„</span><div class="integration-info"><strong>{{ connection.name }}</strong><small><code>{{ connection.key }}</code> Â· {{ connection.baseUrl }}</small></div><span class="status" [class.published]="connection.hasSecret">{{ connection.hasSecret ? 'Credential set' : 'No credential' }}</span><button class="button secondary small" (click)="editIntegration(connection)">Configure</button></div> }
+          @empty { <div class="muted-empty">No connections yet. Add an HTTPS endpoint that workflow HTTP steps can call.</div> }
+        </article>
+        <article class="panel integration-form"><div class="section-heading"><div><h2>{{ editingIntegration ? 'Connection settings' : 'Add a connection' }}</h2><p>Base URL and key are fixed after creation; you can rotate the secret.</p></div></div>
+          <form (ngSubmit)="saveIntegration()">
+            <label>Connection key<input [(ngModel)]="integrationDraft.key" name="connection-key" required pattern="[a-z][a-z0-9-]{0,63}" [disabled]="!!editingIntegration" placeholder="hr-system"></label>
+            <label>Display name<input [(ngModel)]="integrationDraft.name" name="connection-name" required maxlength="120" placeholder="Human resources API"></label>
+            <label>HTTPS base URL<input [(ngModel)]="integrationDraft.baseUrl" name="connection-url" required [disabled]="!!editingIntegration" placeholder="https://api.example.com/"></label>
+            <label>Credential header<input [(ngModel)]="integrationDraft.authHeaderName" name="connection-header" placeholder="Authorization or X-API-Key"><small>Leave blank for a public API.</small></label>
+            @if (integrationDraft.authHeaderName === 'Authorization') { <label>Authorization scheme<select [(ngModel)]="integrationDraft.authScheme" name="connection-scheme"><option value="Bearer">Bearer token</option><option value="Basic">Basic</option></select></label> }
+            <label>Secret<input type="password" [(ngModel)]="integrationDraft.secret" name="connection-secret" [required]="!editingIntegration && !!integrationDraft.authHeaderName" [placeholder]="editingIntegration ? 'Leave blank to keep current secret' : 'Paste token or API key'"><small>The API encrypts this value using the deployment key before storing it.</small></label>
+            @if (editingIntegration && integrationDraft.authHeaderName) { <label class="clear-secret"><input type="checkbox" [(ngModel)]="integrationDraft.clearSecret" name="clear-secret"> Remove stored credential</label> }
+            <button class="button primary" type="submit" [disabled]="busy">{{ busy ? 'Savingâ€¦' : 'Save connection' }}</button>
+          </form>
+          <div class="security-note"><strong>Host allowlist</strong><p>The API accepts only base URLs whose hostname appears in <code>INTEGRATION_ALLOWED_HOSTS</code>. Redirects are disabled.</p></div>
+        </article>
+      </section>
+    }
+
+    @if (activeTab === 'instances') {
+      <section class="page-heading"><div><p class="eyebrow">EXECUTION HISTORY</p><h1>Workflow instances</h1><p>Start published workflows and inspect their progress and output.</p></div><button class="button secondary" (click)="refreshInstances()">â†» Refresh</button></section>
+      @if (selectedDefinition) {
+        <section class="panel start-panel"><div class="section-heading"><div><h2>Start {{ selectedDefinition.title }}</h2><p>{{ selectedDefinition.name }} Â· revision {{ selectedDefinition.revision }}</p></div><button class="text-button" (click)="selectedDefinition = null">Close</button></div><label>Input JSON<textarea rows="9" [(ngModel)]="inputJson" name="workflow-input"></textarea></label><button class="button primary" [disabled]="busy" (click)="submitWorkflow()">{{ busy ? 'Startingâ€¦' : 'Start workflow' }}</button></section>
+      }
+      <section class="instance-layout">
+        <article class="panel table-panel"><div class="section-heading"><div><h2>My instances</h2><p>{{ instances.length }} recent workflow runs</p></div></div>
+          @if (instances.length === 0) { <div class="muted-empty">No instances yet. Start a published workflow to see its execution here.</div> }
+          @for (instance of instances; track instance.id) { <button class="instance-row" [class.selected]="selectedInstance && selectedInstance.instance.id === instance.id" (click)="openInstance(instance.id)"><span class="instance-icon">â—·</span><span class="instance-main"><strong>{{ instance.definitionName }}</strong><small>{{ instance.id }} Â· {{ instance.createdAt | date:'medium' }}</small></span><span class="status" [class.published]="instance.status === 'completed'">{{ instance.outcome || instance.status }}</span><span class="arrow">â€º</span></button> }
+        </article>
+        <article class="panel detail-panel"><div class="section-heading"><div><h2>Execution details</h2><p>{{ selectedInstance ? selectedInstance.instance.id : 'Select an instance' }}</p></div></div>
+          @if (selectedInstance; as detail) {
+            <div class="detail-summary"><span>{{ detail.instance.definitionName }} Â· v{{ detail.instance.definitionRevision }}</span><strong>{{ detail.instance.outcome || detail.instance.status }}</strong></div>
+            @if (detail.instance.error) { <div class="alert error">{{ detail.instance.error }}</div> }
+            <h3>Input</h3><pre>{{ detail.input | json }}</pre>
+            @if (detail.output) { <h3>Output</h3><pre>{{ detail.output | json }}</pre> }
+            <h3>Steps</h3><ol class="timeline">@for (step of detail.steps; track step.id) { <li><span class="timeline-dot"></span><div><strong>{{ step.nodeId }} Â· {{ step.nodeType }}</strong><small>{{ step.status }}</small><time>{{ step.startedAt | date:'short' }}</time>@if (step.output) { <pre>{{ step.output | json }}</pre> }@if (step.error) { <small class="field-error">{{ step.error }}</small> }</div></li> }</ol>
+            <h3>History</h3><ol class="timeline">@for (event of detail.events; track event.occurredAt + event.type) { <li><span class="timeline-dot"></span><div><strong>{{ event.type.replaceAll('-', ' ') }}</strong><small>{{ event.actorSubject }} Â· {{ event.nodeId || 'workflow' }}</small><time>{{ event.occurredAt | date:'short' }}</time></div></li> }</ol>
+          } @else { <div class="muted-empty">Execution input, step history, role assignments and integration results appear here.</div> }
+        </article>
+      </section>
+    }
+
+    @if (activeTab === 'work') {
+      <section class="page-heading"><div><p class="eyebrow">ROLE-BASED TASKS</p><h1>My work</h1><p>Work items assigned to roles in your identity claims.</p></div><button class="button secondary" (click)="refreshWorkItems()">â†» Refresh</button></section>
+      <section class="work-grid">
+        @for (item of workItems; track item.id) {
+          <article class="panel work-card"><div class="work-meta"><span class="role-pill">{{ item.assignedRole }}</span><span>{{ item.createdAt | date:'medium' }}</span></div><h2>{{ item.title }}</h2><p>{{ item.workflow.definitionName }} Â· instance <code>{{ item.workflowInstanceId }}</code></p><h3>Task data</h3><pre>{{ item.input | json }}</pre><div class="completion-form"><h3>Your decision</h3>@for (field of completionFields(item); track field.name) {<label>{{ field.name }}@if (field.required) { <span aria-label="required">*</span> }@if (field.schema['enum']?.length) {<select [(ngModel)]="completionValues[item.id][field.name]" [name]="'completion-' + item.id + '-' + field.name">@for (option of field.schema['enum']; track option) {<option [ngValue]="option">{{ option }}</option>}</select>} @else if (field.schema['type'] === 'boolean') {<input type="checkbox" [(ngModel)]="completionValues[item.id][field.name]" [name]="'completion-' + item.id + '-' + field.name">} @else {<input [type]="field.schema['type'] === 'number' || field.schema['type'] === 'integer' ? 'number' : 'text'" [required]="field.required" [minlength]="field.schema['minLength'] ?? null" [maxlength]="field.schema['maxLength'] ?? null" [(ngModel)]="completionValues[item.id][field.name]" [name]="'completion-' + item.id + '-' + field.name">}</label>}@empty {<p>This task has no completion fields.</p>}</div><div class="work-actions"><button class="text-button" (click)="activeTab = 'instances'; openInstance(item.workflowInstanceId)">View execution</button><button class="button primary" (click)="completeWork(item)">Complete task</button></div></article>
+        } @empty { <div class="empty-state"><div class="empty-icon">âœ“</div><h2>Nothing waiting</h2><p>Work appears here when a running workflow reaches one of your assigned roles.</p></div> }
+      </section>
+    }
+
+    <footer><span>Open source workflow runtime</span><span>{{ instances.length }} instances Â· {{ workItems.length }} pending work items</span></footer>
   </main>
 </div>

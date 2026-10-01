@@ -26,7 +26,10 @@ services:
       ConnectionStrings__WorkflowDatabase: Host=postgres;Port=5432;Database=${POSTGRES_DB:-workflow_engine};Username=${POSTGRES_USER:-workflow_engine};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       Authentication__Authority: ${OIDC_AUTHORITY:?Set OIDC_AUTHORITY in .env}
       Authentication__Audience: ${OIDC_AUDIENCE:?Set OIDC_AUDIENCE in .env}
-      Workflow__PurchaseApproverSubject: ${PURCHASE_APPROVER_SUBJECT:-manager@example.test}
+      Authentication__RoleClaimType: ${OIDC_ROLE_CLAIM:-role}
+      Workflow__AdminRole: ${WORKFLOW_ADMIN_ROLE:-workflow-admin}
+      Integrations__AllowedHosts: ${INTEGRATION_ALLOWED_HOSTS:-}
+      Integrations__EncryptionKey: ${INTEGRATION_ENCRYPTION_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy

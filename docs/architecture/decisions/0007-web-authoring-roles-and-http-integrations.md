@@ -24,7 +24,7 @@ The first usable designer supports these node types:
 
 Role membership is derived from authenticated identity claims configured for the deployment. A task is visible and actionable only to a subject authorized for its assigned role. Workflow definitions name roles; they do not provision users or contain provider-specific identity credentials.
 
-HTTP actions call a configured endpoint through a durable worker. Definitions reference a credential by stable key; secrets are configured and stored outside the definition document and are never returned to the browser after entry. Each action has bounded timeouts and retry policy, a durable attempt record, and an idempotency strategy appropriate to its configured operation. Arbitrary scripts and user-defined executable plugins are not allowed.
+HTTP actions call a configured integration connection through a durable worker. An integration has an immutable HTTPS base URL and a stable key; definitions can select only a connection and a relative API path. The base hostname must be in the deployment allowlist. The UI accepts an optional API credential, stores it AES-GCM encrypted in PostgreSQL, and never returns it after entry. The encryption key is deployment-managed and must be backed up. Each action has bounded timeouts and retry policy, a durable attempt record, and an idempotency strategy appropriate to its configured operation. Arbitrary scripts and user-defined executable plugins are not allowed.
 
 The first integration surface is generic HTTP/REST. A built-in catalog for specific vendors, inbound webhook triggers, and outbound completion callbacks can follow after the generic action's authorization, failure, and delivery behavior is operational.
 
@@ -32,7 +32,7 @@ The first integration surface is generic HTTP/REST. A built-in catalog for speci
 
 - The current approval-only UI must become definition-driven and render work-item fields from task configuration/contracts.
 - The runtime needs durable HTTP action dispatch, result persistence, and explicit retry behavior before claiming reliable external integration.
-- Operators need a deployment mechanism for named integration credentials. Secret values cannot live in ordinary workflow JSON or be logged.
+- Operators must keep the integration encryption key stable and recoverable. Secret values cannot live in ordinary workflow JSON or be logged.
 - Role claim mapping and authorization become core configuration and require clear setup documentation.
 - Definition validation must be shared between authoring and publication so the UI cannot publish a graph the runtime interprets differently.
 - The first canvas may be deliberately small; it needs to make route, role, and integration behavior inspectable without promising BPMN completeness.

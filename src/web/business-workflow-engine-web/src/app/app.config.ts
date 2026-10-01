@@ -11,8 +11,9 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideHttpClient(withInterceptors([(request, next) => {
       const subject = localStorage.getItem('demo-subject') ?? 'requester@example.test';
+      const roles = localStorage.getItem('demo-roles') ?? '';
       const accessToken = sessionStorage.getItem('api-access-token');
-      const headers: Record<string, string> = { 'X-Demo-User': subject };
+      const headers: Record<string, string> = { 'X-Demo-User': subject, 'X-Demo-Roles': roles };
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
       return next(request.clone({ setHeaders: headers }));
     }]))

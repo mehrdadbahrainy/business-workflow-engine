@@ -1,6 +1,6 @@
 # Repository Structure
 
-**Status:** Current implementation layout for the first self-hosted vertical slice.
+**Status:** Current layout for the generic workflow authoring and runtime MVP.
 
 ```text
 .
@@ -23,8 +23,10 @@
 │   ├── operations/
 │   └── product/
 ├── examples/
+│   ├── employee-leave/
+│   │   └── workflow.json
 │   └── purchase-approval/
-│       └── definition.json
+│       └── workflow.json
 ├── src/
 │   ├── server/
 │   │   └── BusinessWorkflowEngine.Api/
@@ -42,7 +44,7 @@
 
 The MVP has one deployable backend and one consistency boundary. Keeping its workflow definition, execution, human-task, and execution-history behavior in one .NET project avoids project-reference choreography before there is a proven need for it. The folders express ownership while the modules share a process and relational database.
 
-The Angular application is separate because it has a distinct toolchain and deployment asset. The purchase-approval definition lives under `examples/` so it remains inspectable and versioned independently from API implementation code.
+The Angular application is separate because it has a distinct toolchain and deployment asset. Generic workflow definitions live under `examples/` so they remain inspectable and versioned independently from API implementation code. The purchase-approval and employee-leave examples exercise the same definition contract and runtime.
 
 The development Compose file starts PostgreSQL for host-based development. The production Compose file builds the API and web images and runs the single-host self-hosted stack. They are separate on purpose: development credentials are not production deployment settings.
 

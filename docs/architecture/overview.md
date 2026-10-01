@@ -68,7 +68,7 @@ Identity provisioning, provider-specific SSO, multi-tenancy, a broad connector c
 
 ## Staged capability boundary
 
-- **Generic runtime foundation:** versioned JSON definitions, typed JSON input/output, start/end, role-based user-task, variable assignment, exclusive conditional routing, and HTTP/REST actions. Definitions are authored through the web designer and published through an API. The purchase flow is a sample.
+- **Generic runtime foundation:** versioned JSON definitions, typed JSON input/output, start/end, role-based user-task, variable assignment, exclusive conditional routing, and HTTP/REST actions. Definitions are authored through the web designer and published through an API. See the [v1 definition contract](workflow-definition-v1.md).
 - **Integration reliability:** durable worker queue, bounded retries, secret-safe credentials, inbound webhooks, and an outbox for outbound callbacks.
 - **Later, driven by concrete use cases:** provider-specific connectors, timers, parallel branches and joins, and cancellation/compensation.
 

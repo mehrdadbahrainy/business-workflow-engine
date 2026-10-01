@@ -4,18 +4,18 @@
 
 An open-source, self-hostable workflow engine for defining and running business processes. The product direction includes a web workflow designer, role-based work routing, and HTTP integrations with external systems. Definitions specify their inputs, steps, routes, and outputs; instances persist progress and execution history.
 
-**Project status: early implementation.** The current runtime is a purchase-approval vertical slice and is not yet generic. The product direction is a reusable engine where purchase approval is one example definition, not a product boundary. The project has not yet been validated with target users or hardened for production use.
+**Project status: early implementation.** The first generic execution slice now includes web definition authoring, role tasks, and configurable HTTP connections. It is not yet production-hardened or validated with target users.
 
 ## What works today
 
-- Start a purchase request through a versioned HTTP API.
-- Apply the seeded amount threshold: requests at or below USD 1,000 complete automatically; requests above it wait for the configured approver.
-- Persist workflow state, approval tasks, and execution history in PostgreSQL using EF Core migrations.
-- Return the original request for a matching `Idempotency-Key` retry, reject reuse of that key with different content, and prevent decisions by anyone except the assigned approver.
-- Review a personal request list, pending approval queue, and request timeline in the Angular operations UI.
-- Complete an approval or rejection and retrieve the recorded outcome.
+- Create workflow definitions in the browser, set input/output fields, connect supported nodes, add conditional routes, and publish immutable revisions.
+- Run the included purchase-approval and employee-leave definitions through the same runtime, without purchase-specific fields in the generic runtime tables.
+- Route durable user tasks to roles from the caller's identity claims; complete tasks through the generic work queue.
+- Configure reusable HTTPS system connections in the UI. Integration secrets are AES-GCM encrypted in PostgreSQL; workflow HTTP nodes reference the connection key and cannot select a different host.
+- Execute HTTP actions through a persisted queue with a 15-second timeout, a 1 MiB response limit, up to three retryable attempts, and an operator-managed hostname allowlist.
+- Inspect instance input/output, step execution, action results, and event history in the operations interface.
 
-The current API and persistence model are still purchase-specific. Turning them into a definition-driven runtime is the next core engineering objective. A visual designer, purchasing system, and payment processor are not part of the engine's purpose.
+The earlier purchase-specific routes remain as a compatibility/demo path. New process behavior belongs in versioned definitions and generic runtime code.
 
 ## Technology
 
@@ -36,7 +36,7 @@ Start PostgreSQL from the repository root:
 docker compose up -d --wait postgres
 ```
 
-In one terminal, start the API. On first startup it applies the checked-in EF migration and seeds the purchase-approval definition from [`examples/purchase-approval/definition.json`](examples/purchase-approval/definition.json).
+In one terminal, start the API. On first startup it applies checked-in EF migrations, keeps the legacy purchase demo available, and seeds the generic [`purchase approval`](examples/purchase-approval/workflow.json) and [`employee leave`](examples/employee-leave/workflow.json) definitions.
 
 ```powershell
 dotnet restore BusinessWorkflowEngine.sln
@@ -51,7 +51,7 @@ npm ci
 npm start
 ```
 
-Open the Angular dev-server URL shown in the terminal. Its `/api` requests proxy to the local API. In Development only, the UI sends an `X-Demo-User` identity header. Switch to `manager@example.test` in the top bar to see and decide requests waiting for the seeded approver. This demo identity handler is not enabled outside the Development environment. For a secured deployment, provide a JWT from the configured host identity provider in the **Host API token** field; the UI keeps it in the current browser tab's session storage. The project does not implement an identity-provider login flow.
+Open the Angular dev-server URL shown in the terminal. Its `/api` requests proxy to the local API. In Development only, the UI sends `X-Demo-User` and `X-Demo-Roles` identity headers. The subjects `manager@example.test`, `teamlead@example.test`, `department@example.test`, and `hr@example.test` receive the matching demo role. Other development roles can be entered in the top-bar identity menu. This demo identity handler is not enabled outside Development. For a secured deployment, provide a JWT from the configured host identity provider in the **Host API token** field; the UI keeps it in the current browser tab's session storage. The project does not implement an identity-provider login flow.
 
 The API's OpenAPI document is available at `http://localhost:5195/openapi/v1.json` while running in Development. It describes the HTTP operations, the required `Idempotency-Key` header, and the Development-only `X-Demo-User` authentication scheme; OpenAPI is not exposed by the production configuration.
 
@@ -63,7 +63,15 @@ The production Compose stack runs PostgreSQL, the .NET API, and the Angular oper
 Copy-Item .env.example .env
 ```
 
-Edit `.env` before starting the stack. Set a long random hexadecimal `POSTGRES_PASSWORD`, the issuer URL and audience accepted by your identity provider, and `PURCHASE_APPROVER_SUBJECT` to the exact `sub` value of the approver. Configure your TLS-terminating reverse proxy to forward to the web port (8080 by default).
+Edit `.env` before starting the stack. Set a long random hexadecimal `POSTGRES_PASSWORD`, the issuer URL and audience accepted by your identity provider, `OIDC_ROLE_CLAIM` to the JWT claim containing role ids, and `WORKFLOW_ADMIN_ROLE` to the role allowed to edit definitions and connections. Configure your TLS-terminating reverse proxy to forward to the web port (8080 by default).
+
+To add an external system connection, add its hostname to `INTEGRATION_ALLOWED_HOSTS` (comma-separated). To store a credential in the web UI, set `INTEGRATION_ENCRYPTION_KEY` to a stable base64-encoded 32-byte key. Generate one with PowerShell:
+
+```powershell
+[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+```
+
+Keep this key in deployment secrets and back it up separately. Losing or rotating it without re-entering saved credentials makes those credentials unreadable. The UI never returns a saved secret. Integration base URLs are HTTPS and immutable; create a new connection key to target another host.
 
 ```powershell
 docker compose --env-file .env -f compose.production.yaml up --build --wait
@@ -83,7 +91,7 @@ The default local database credentials in `appsettings.json` and `compose.yaml` 
 
 ## API overview
 
-All workflow routes require authentication. The API uses the authenticated subject to scope request lists and approval decisions.
+All workflow routes require authentication. Definition and integration writes also require the configured workflow administrator role. Role tasks are visible only to subjects with the assigned role claim.
 
 For `POST /api/v1/purchase-requests`, retrying with the same actor, key, and normalized request content returns the original instance. Reusing the key with different content or a different actor returns `409 Conflict`.
 
@@ -91,6 +99,18 @@ For `POST /api/v1/purchase-requests`, retrying with the same actor, key, and nor
 | --- | --- | --- |
 | `GET` | `/healthz` | Liveness check; confirms the API process is running |
 | `GET` | `/readyz` | Readiness check; returns `503` when the workflow database cannot be reached |
+| `GET` | `/api/v1/workflow-definitions` | List published definitions; workflow authors also see drafts |
+| `GET` | `/api/v1/workflow-definitions/{name}/{revision}` | Read a published definition or an authorized author's draft |
+| `PUT` | `/api/v1/workflow-definitions/{name}/{revision}` | Save a validated draft; requires workflow administrator role |
+| `POST` | `/api/v1/workflow-definitions/{name}/{revision}/publish` | Publish an immutable revision |
+| `GET` | `/api/v1/integrations` | List connection metadata without secrets |
+| `POST` | `/api/v1/integrations` | Create a secured HTTP connection; requires workflow administrator role |
+| `PUT` | `/api/v1/integrations/{key}` | Update connection name or rotate/clear its secret; base URL is immutable |
+| `POST` | `/api/v1/workflows/{name}/instances` | Start a definition with JSON input and `Idempotency-Key` |
+| `GET` | `/api/v1/workflow-instances` | List instances started by the caller |
+| `GET` | `/api/v1/workflow-instances/{id}` | Read an authorized instance, input/output, steps, and events |
+| `GET` | `/api/v1/work-items` | List pending work assigned to the caller's roles |
+| `POST` | `/api/v1/work-items/{id}/complete` | Complete a role-assigned task with JSON data |
 | `POST` | `/api/v1/purchase-requests` | Start a purchase request; requires `Idempotency-Key` |
 | `GET` | `/api/v1/purchase-requests` | List requests started by the caller |
 | `GET` | `/api/v1/purchase-requests/{id}` | Read a request and its event history when the caller initiated it or is assigned to it |
@@ -117,9 +137,7 @@ Example decision body:
 }
 ```
 
-The API project's [`BusinessWorkflowEngine.Api.http`](src/server/BusinessWorkflowEngine.Api/BusinessWorkflowEngine.Api.http) file contains a runnable local request, retry, list, history, and approval walkthrough for the VS Code REST Client extension. The task ID in the final decision request is a placeholder; replace it with one returned by the pending-approvals request.
-
-The seeded threshold is denominated in USD; the first implementation accepts USD requests only. There is no purchase order creation, external side effect, outbound webhook, or workflow designer.
+The API project's [`BusinessWorkflowEngine.Api.http`](src/server/BusinessWorkflowEngine.Api/BusinessWorkflowEngine.Api.http) file contains generic and compatibility request examples. The supported definition nodes and mapping paths are documented in the [workflow definition v1 contract](docs/architecture/workflow-definition-v1.md). HTTP action delivery is at least once; external systems should honor the idempotency key supplied by the engine.
 
 ## Design notes
 
@@ -128,10 +146,11 @@ The seeded threshold is denominated in USD; the first implementation accepts USD
 - [Self-host backup and restore runbook](docs/operations/backup-and-restore.md)
 - [Problem statement and product hypothesis](docs/product/problem-statement.md)
 - [Product discovery plan](docs/product/validation-plan.md)
-- [First use case: purchase approval](docs/product/first-use-case.md)
+- [Example process: purchase approval](docs/product/first-use-case.md)
 - [MVP scope](docs/product/mvp-scope.md)
-- [Initial domain model](docs/architecture/domain-model.md)
-- [Initial architecture](docs/architecture/overview.md)
+- [Workflow definition v1](docs/architecture/workflow-definition-v1.md)
+- [Domain model](docs/architecture/domain-model.md)
+- [Architecture](docs/architecture/overview.md)
 - [Repository structure](docs/architecture/repository-structure.md)
 - [Architecture decision records](docs/architecture/decisions/)
 

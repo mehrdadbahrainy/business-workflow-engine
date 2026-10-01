@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "name": "purchase-approval",
+  "revision": 1,
+  "title": "Purchase approval",
+  "description": "Routes purchase requests to a manager based on the requested amount.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "requesterReference": { "type": "string" },
+      "description": { "type": "string" },
+      "amount": { "type": "number" },
+      "currency": { "type": "string" }
+    },
+    "required": ["requesterReference", "description", "amount", "currency"],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "requesterReference": { "type": "string" },
+      "decision": { "type": "string" },
+      "amount": { "type": "number" },
+      "currency": { "type": "string" }
+    },
+    "required": ["requesterReference", "decision", "amount", "currency"],
+    "additionalProperties": false
+  },
+  "roles": [{ "id": "manager", "name": "Manager" }],
+  "nodes": [
+    { "id": "start", "type": "start", "config": {}, "transitions": [{ "to": "check-amount" }] },
+    { "id": "check-amount", "type": "gateway", "config": {}, "transitions": [
+      { "to": "manager-review", "when": { "path": "$.input.amount", "operator": "gt", "value": 1000 } },
+      { "to": "auto-approved", "when": null }
+    ] },
+    { "id": "manager-review", "type": "userTask", "config": {
+      "role": "manager", "title": "Review purchase request",
+      "input": { "reference": "$.input.requesterReference", "description": "$.input.description", "amount": "$.input.amount", "currency": "$.input.currency" },
+      "completionSchema": { "type": "object", "properties": { "decision": { "type": "string", "enum": ["approve", "reject"] }, "comment": { "type": "string" } }, "required": ["decision"], "additionalProperties": false }
+    }, "transitions": [{ "to": "manager-decision" }] },
+    { "id": "manager-decision", "type": "gateway", "config": {}, "transitions": [
+      { "to": "rejected", "when": { "path": "$.lastTask.decision", "operator": "eq", "value": "reject" } },
+      { "to": "approved", "when": null }
+    ] },
+    { "id": "auto-approved", "type": "end", "config": { "outcome": "auto-approved", "output": { "requesterReference": "$.input.requesterReference", "decision": "auto-approved", "amount": "$.input.amount", "currency": "$.input.currency" } }, "transitions": [] },
+    { "id": "approved", "type": "end", "config": { "outcome": "approved", "output": { "requesterReference": "$.input.requesterReference", "decision": "$.lastTask.decision", "amount": "$.input.amount", "currency": "$.input.currency" } }, "transitions": [] },
+    { "id": "rejected", "type": "end", "config": { "outcome": "rejected", "output": { "requesterReference": "$.input.requesterReference", "decision": "$.lastTask.decision", "amount": "$.input.amount", "currency": "$.input.currency" } }, "transitions": [] }
+  ]
+}

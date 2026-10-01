@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "name": "employee-leave",
+  "revision": 1,
+  "title": "Employee leave request",
+  "description": "Short leave requests go to a team lead; longer requests need a department manager and HR.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "employeeId": { "type": "string" },
+      "employeeName": { "type": "string" },
+      "days": { "type": "integer" },
+      "reason": { "type": "string" }
+    },
+    "required": ["employeeId", "employeeName", "days", "reason"],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "employeeId": { "type": "string" },
+      "decision": { "type": "string" },
+      "reviewedBy": { "type": "string" }
+    },
+    "required": ["employeeId", "decision", "reviewedBy"],
+    "additionalProperties": false
+  },
+  "roles": [
+    { "id": "team-lead", "name": "Team lead" },
+    { "id": "department-manager", "name": "Department manager" },
+    { "id": "hr", "name": "Human resources" }
+  ],
+  "nodes": [
+    { "id": "start", "type": "start", "config": {}, "transitions": [{ "to": "route-by-duration" }] },
+    { "id": "route-by-duration", "type": "gateway", "config": {}, "transitions": [
+      { "to": "team-lead-review", "when": { "path": "$.input.days", "operator": "lte", "value": 5 } },
+      { "to": "manager-review", "when": null }
+    ] },
+    { "id": "team-lead-review", "type": "userTask", "config": {
+      "role": "team-lead", "title": "Review short leave request",
+      "input": { "employee": "$.input.employeeName", "days": "$.input.days", "reason": "$.input.reason" },
+      "completionSchema": { "type": "object", "properties": { "decision": { "type": "string", "enum": ["approved", "rejected"] }, "reviewer": { "type": "string" } }, "required": ["decision", "reviewer"], "additionalProperties": false }
+    }, "transitions": [{ "to": "team-lead-outcome" }] },
+    { "id": "team-lead-outcome", "type": "gateway", "config": {}, "transitions": [
+      { "to": "team-lead-approved", "when": { "path": "$.lastTask.decision", "operator": "eq", "value": "approved" } },
+      { "to": "team-lead-rejected", "when": null }
+    ] },
+    { "id": "manager-review", "type": "userTask", "config": {
+      "role": "department-manager", "title": "Review extended leave request",
+      "input": { "employee": "$.input.employeeName", "days": "$.input.days", "reason": "$.input.reason" },
+      "completionSchema": { "type": "object", "properties": { "decision": { "type": "string", "enum": ["approved", "rejected"] }, "reviewer": { "type": "string" } }, "required": ["decision", "reviewer"], "additionalProperties": false }
+    }, "transitions": [{ "to": "manager-outcome" }] },
+    { "id": "manager-outcome", "type": "gateway", "config": {}, "transitions": [
+      { "to": "hr-review", "when": { "path": "$.lastTask.decision", "operator": "eq", "value": "approved" } },
+      { "to": "manager-rejected", "when": null }
+    ] },
+    { "id": "hr-review", "type": "userTask", "config": {
+      "role": "hr", "title": "Record extended leave",
+      "input": { "employee": "$.input.employeeName", "days": "$.input.days" },
+      "completionSchema": { "type": "object", "properties": { "decision": { "type": "string", "enum": ["approved", "rejected"] }, "reviewer": { "type": "string" } }, "required": ["decision", "reviewer"], "additionalProperties": false }
+    }, "transitions": [{ "to": "hr-outcome" }] },
+    { "id": "hr-outcome", "type": "gateway", "config": {}, "transitions": [
+      { "to": "extended-approved", "when": { "path": "$.lastTask.decision", "operator": "eq", "value": "approved" } },
+      { "to": "hr-rejected", "when": null }
+    ] },
+    { "id": "team-lead-approved", "type": "end", "config": { "outcome": "approved", "output": { "employeeId": "$.input.employeeId", "decision": "approved", "reviewedBy": "$.lastTask.reviewer" } }, "transitions": [] },
+    { "id": "team-lead-rejected", "type": "end", "config": { "outcome": "rejected", "output": { "employeeId": "$.input.employeeId", "decision": "rejected", "reviewedBy": "$.lastTask.reviewer" } }, "transitions": [] },
+    { "id": "manager-rejected", "type": "end", "config": { "outcome": "rejected", "output": { "employeeId": "$.input.employeeId", "decision": "rejected", "reviewedBy": "$.lastTask.reviewer" } }, "transitions": [] },
+    { "id": "extended-approved", "type": "end", "config": { "outcome": "approved", "output": { "employeeId": "$.input.employeeId", "decision": "approved", "reviewedBy": "$.lastTask.reviewer" } }, "transitions": [] },
+    { "id": "hr-rejected", "type": "end", "config": { "outcome": "rejected", "output": { "employeeId": "$.input.employeeId", "decision": "rejected", "reviewedBy": "$.lastTask.reviewer" } }, "transitions": [] }
+  ]
+}

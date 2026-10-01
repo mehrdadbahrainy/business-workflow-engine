@@ -26,6 +26,26 @@ public static class DatabaseInitializer
             });
             await db.SaveChangesAsync();
         }
+        await SeedRuntimeDefinitionAsync(db, Path.Combine(AppContext.BaseDirectory, "Definitions", "purchase-approval-workflow-v1.json"));
+        await SeedRuntimeDefinitionAsync(db, Path.Combine(AppContext.BaseDirectory, "Definitions", "employee-leave-workflow-v1.json"));
+    }
+
+    private static async Task SeedRuntimeDefinitionAsync(WorkflowDbContext db, string path)
+    {
+        await using var stream = File.OpenRead(path);
+        var document = await JsonSerializer.DeserializeAsync<WorkflowDefinitionDocument>(stream, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            ?? throw new InvalidOperationException($"Workflow definition at '{path}' is empty.");
+        var errors = WorkflowDefinitionValidator.Validate(document);
+        if (errors.Count > 0) throw new InvalidOperationException($"Workflow definition '{document.Name}' is invalid: {string.Join(" ", errors)}");
+        if (await db.WorkflowDefinitionRevisions.AnyAsync(x => x.Name == document.Name && x.Revision == document.Revision)) return;
+        var now = DateTimeOffset.UtcNow;
+        db.WorkflowDefinitionRevisions.Add(new WorkflowDefinitionRevision
+        {
+            Name = document.Name, Revision = document.Revision, Title = document.Title, Description = document.Description,
+            DocumentJson = JsonSerializer.Serialize(document, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Status = "published", IsPublished = true, CreatedBy = "system:seed", CreatedAt = now, PublishedAt = now
+        });
+        await db.SaveChangesAsync();
     }
 
     private sealed record PurchaseApprovalDefinition(string Name, int Revision, decimal ApprovalThreshold, string ApproverSubject);
