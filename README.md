@@ -89,7 +89,8 @@ For `POST /api/v1/purchase-requests`, retrying with the same actor, key, and nor
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/healthz` | Liveness check |
+| `GET` | `/healthz` | Liveness check; confirms the API process is running |
+| `GET` | `/readyz` | Readiness check; returns `503` when the workflow database cannot be reached |
 | `POST` | `/api/v1/purchase-requests` | Start a purchase request; requires `Idempotency-Key` |
 | `GET` | `/api/v1/purchase-requests` | List requests started by the caller |
 | `GET` | `/api/v1/purchase-requests/{id}` | Read a request and its event history when the caller initiated it or is assigned to it |

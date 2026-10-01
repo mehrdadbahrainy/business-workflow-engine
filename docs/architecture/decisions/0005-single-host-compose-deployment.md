@@ -9,7 +9,7 @@ The first workflow should be straightforward for a small organization to run on 
 
 ## Decision
 
-Provide a production Compose file that builds and runs PostgreSQL, one API container, and one Nginx container serving the Angular application and proxying API requests. Keep PostgreSQL data in a named volume. The API applies checked-in EF Core migrations at startup and validates JWT bearer tokens from the host's configured OIDC authority. The public web port is intended to sit behind a TLS-terminating reverse proxy.
+Provide a production Compose file that builds and runs PostgreSQL, one API container, and one Nginx container serving the Angular application and proxying API requests. Keep PostgreSQL data in a named volume. The API applies checked-in EF Core migrations at startup and validates JWT bearer tokens from the host's configured OIDC authority. The web container's health check uses API readiness, including workflow database connectivity. The public web port is intended to sit behind a TLS-terminating reverse proxy.
 
 The existing base `compose.yaml` remains a development-only PostgreSQL service for running the API and Angular CLI on the host. The production stack is explicitly selected with `compose.production.yaml` and requires deployment-specific values from `.env`.
 
