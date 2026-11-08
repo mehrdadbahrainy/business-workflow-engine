@@ -40,8 +40,14 @@ public static class WorkflowInstanceEndpoints
     {
         var instance = await db.RuntimeWorkflowInstances.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (instance is null) return Results.NotFound();
-        if (instance.InitiatorSubject != WorkflowRuntimeService.Subject(user) &&
-            !await db.RuntimeWorkItems.AnyAsync(x => x.WorkflowInstanceId == id && UserHasRole(user, x.AssignedRole), cancellationToken)) return Results.Forbid();
+        if (instance.InitiatorSubject != WorkflowRuntimeService.Subject(user))
+        {
+            // Evaluate caller claims outside the EF query: custom methods cannot be translated to SQL.
+            var roles = UserRoles(user);
+            var isAssigned = roles.Length > 0 && await db.RuntimeWorkItems.AsNoTracking()
+                .AnyAsync(x => x.WorkflowInstanceId == id && roles.Contains(x.AssignedRole), cancellationToken);
+            if (!isAssigned) return Results.Forbid();
+        }
         var steps = await db.RuntimeStepExecutions.AsNoTracking().Where(x => x.WorkflowInstanceId == id).OrderBy(x => x.StartedAt).ToListAsync(cancellationToken);
         var events = await db.RuntimeExecutionEvents.AsNoTracking().Where(x => x.WorkflowInstanceId == id).OrderBy(x => x.OccurredAt).ToListAsync(cancellationToken);
         return Results.Ok(new
