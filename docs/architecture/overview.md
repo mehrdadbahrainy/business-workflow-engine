@@ -1,6 +1,6 @@
 # Workflow Engine Architecture
 
-**Status:** Target architecture for a general-purpose, definition-driven workflow runtime. The current code is still a purchase-specific vertical slice and has not reached this design.
+**Status:** Early implementation of generic definition-driven runtime, web authoring, role tasks, and HTTPS actions. This document also describes architectural intent; production readiness is not established. See the [verification report](../quality/verification.md).
 
 ## Architectural goal
 
