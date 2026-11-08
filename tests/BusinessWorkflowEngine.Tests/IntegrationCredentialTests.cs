@@ -39,7 +39,7 @@ public sealed class IntegrationCredentialTests
         var other = CreateProtector(Enumerable.Repeat((byte)2, 32).ToArray());
         var encrypted = source.Protect("Do not expose");
 
-        Assert.Throws<CryptographicException>(() => other.Unprotect(encrypted));
+        Assert.ThrowsAny<CryptographicException>(() => other.Unprotect(encrypted));
     }
 
     [Fact]
