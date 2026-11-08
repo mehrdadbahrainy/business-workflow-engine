@@ -13,6 +13,16 @@ lock = threading.Lock()
 
 
 class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path != "/health":
+            self.send_error(404)
+            return
+        data = b"ok"
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_POST(self):
         with lock:
             count = attempts.get(self.path, 0) + 1
