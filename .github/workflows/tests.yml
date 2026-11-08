@@ -1,0 +1,92 @@
+name: Unit and business acceptance tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-workflows:
+    name: xUnit + PostgreSQL business flows
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: workflow_engine
+          POSTGRES_PASSWORD: workflow_engine
+          POSTGRES_DB: workflow_engine
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U workflow_engine -d workflow_engine"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WorkflowDatabase: "Host=127.0.0.1;Port=5432;Database=workflow_engine;Username=workflow_engine;Password=workflow_engine"
+      WORKFLOW_TEST_URL: http://127.0.0.1:5195
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore unit test project
+        run: dotnet restore tests/BusinessWorkflowEngine.Tests/BusinessWorkflowEngine.Tests.csproj
+
+      - name: Run xUnit contract and validator tests
+        run: dotnet test tests/BusinessWorkflowEngine.Tests/BusinessWorkflowEngine.Tests.csproj --no-restore -c Release --logger "console;verbosity=normal"
+
+      - name: Start API and run business scenarios against PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          API_DLL="src/server/BusinessWorkflowEngine.Api/bin/Release/net10.0/BusinessWorkflowEngine.Api.dll"
+          start_api() {
+            dotnet "$API_DLL" --urls http://127.0.0.1:5195 > /tmp/workflow-api.log 2>&1 &
+            PID=$!
+            for attempt in $(seq 1 100); do
+              if curl -fsS http://127.0.0.1:5195/readyz > /dev/null 2>&1; then
+                return 0
+              fi
+              if ! kill -0 "$PID" 2>/dev/null; then
+                cat /tmp/workflow-api.log
+                return 1
+              fi
+              sleep 0.3
+            done
+            cat /tmp/workflow-api.log
+            echo "API did not become ready" >&2
+            return 1
+          }
+          trap 'kill "$PID" 2>/dev/null || true' EXIT
+          start_api
+          python3 -m unittest discover -s tests/business -p 'test_*.py' -v
+
+          # Restart the actual ASP.NET Core process. State is retained in PostgreSQL.
+          python3 tests/business/test_workflows.py prepare-restart /tmp/pending-work.json
+          kill "$PID"
+          wait "$PID" || true
+          start_api
+          python3 tests/business/test_workflows.py verify-restart /tmp/pending-work.json
+
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-log
+          path: /tmp/workflow-api.log
+          if-no-files-found: ignore
