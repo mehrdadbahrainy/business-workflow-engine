@@ -359,6 +359,49 @@ class BusinessWorkflowTests(unittest.TestCase):
         self.assertEqual(done["instance"]["outcome"], "approved")
 
 
+    def test_18_same_idempotency_key_is_scoped_to_initiator(self):
+        key, body = unique("actor-scoped"), purchase(800)
+        first_code, first = start("purchase-approval", body,
+                                  actor="requester-one@example.test", key=key)
+        second_code, second = start("purchase-approval", body,
+                                    actor="requester-two@example.test", key=key)
+        self.assertEqual(first_code, 202, first)
+        self.assertEqual(second_code, 202, second)
+        self.assertNotEqual(first["id"], second["id"])
+        self.assertEqual(wait_for(first["id"], {"completed"},
+                                  actor="requester-one@example.test")["instance"]["outcome"],
+                         "auto-approved")
+        self.assertEqual(wait_for(second["id"], {"completed"},
+                                  actor="requester-two@example.test")["instance"]["outcome"],
+                         "auto-approved")
+
+    def test_19_missing_idempotency_header_is_rejected(self):
+        status, response = api(
+            "POST", "/api/v1/workflows/purchase-approval/instances",
+            body=purchase(800))
+        self.assertEqual(status, 400, response)
+
+    def test_20_short_leave_can_be_rejected(self):
+        code, created = start("employee-leave", leave(2))
+        self.assertEqual(code, 202, created)
+        wait_for(created["id"], {"waiting-task"})
+        task = work_item(created["id"], "teamlead@example.test")
+        self.assertEqual(complete(task["id"], "rejected",
+                                  "teamlead@example.test", "Lead")[0], 200)
+        done = wait_for(created["id"], {"completed"})
+        self.assertEqual(done["instance"]["outcome"], "rejected")
+        self.assertEqual(done["output"]["decision"], "rejected")
+
+    def test_21_nonparticipant_cannot_read_other_users_workflow(self):
+        code, created = start("purchase-approval", purchase(1900))
+        self.assertEqual(code, 202, created)
+        wait_for(created["id"], {"waiting-task"})
+        status, _ = get_instance(created["id"], actor="unrelated@example.test")
+        self.assertEqual(status, 403)
+        status, _ = get_instance(created["id"], actor="manager@example.test")
+        self.assertEqual(status, 200)
+
+
 def prepare_restart(path):
     status, created = start("purchase-approval", purchase(2300))
     if status != 202:
