@@ -34,6 +34,7 @@ jobs:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__WorkflowDatabase: "Host=127.0.0.1;Port=5432;Database=workflow_engine;Username=workflow_engine;Password=workflow_engine"
       WORKFLOW_TEST_URL: http://127.0.0.1:5195
+      Integrations__AllowedHosts: localhost
 
     steps:
       - name: Check out repository
@@ -72,7 +73,15 @@ jobs:
             echo "API did not become ready" >&2
             return 1
           }
-          trap 'kill "$PID" 2>/dev/null || true' EXIT
+          # Loopback-only TLS endpoint. Trust this disposable test certificate on the runner.
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+            -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost" \
+            -keyout /tmp/mock-https.key -out /tmp/mock-https.crt > /dev/null 2>&1
+          sudo cp /tmp/mock-https.crt /usr/local/share/ca-certificates/workflow-mock-https.crt
+          sudo update-ca-certificates > /dev/null
+          python3 tests/business/mock_https.py /tmp/mock-https.crt /tmp/mock-https.key > /tmp/mock-https.log 2>&1 &
+          MOCK_PID=$!
+          trap 'kill "$PID" "$MOCK_PID" 2>/dev/null || true' EXIT
           start_api
           python3 -m unittest discover -s tests/business -p 'test_*.py' -v
 
@@ -88,5 +97,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: api-test-log
-          path: /tmp/workflow-api.log
+          path: |
+            /tmp/workflow-api.log
+            /tmp/mock-https.log
           if-no-files-found: ignore
