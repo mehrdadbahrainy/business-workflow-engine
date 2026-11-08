@@ -8,6 +8,8 @@ An open-source, self-hostable workflow engine for defining and running business 
 
 **Architecture case study:** [From a Business Request to a Durable Workflow Engine](docs/architecture/case-study.md) — the problem, the major decisions and trade-offs, execution and failure paths, and what remains unverified.
 
+**Verification:** [Business acceptance and unit test matrix](docs/testing/verification-matrix.md) — test scenarios, automated CI environment, evidence requirements, and known gaps. See [GitHub Actions test runs](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/tests.yml) for actual execution results.
+
 ## What works today
 
 - Create workflow definitions in the browser, set input/output fields, connect supported nodes, add conditional routes, and publish immutable revisions.
