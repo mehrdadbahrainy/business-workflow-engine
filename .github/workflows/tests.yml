@@ -79,9 +79,21 @@ jobs:
             -keyout /tmp/mock-https.key -out /tmp/mock-https.crt > /dev/null 2>&1
           sudo cp /tmp/mock-https.crt /usr/local/share/ca-certificates/workflow-mock-https.crt
           sudo update-ca-certificates > /dev/null
-          python3 tests/business/mock_https.py /tmp/mock-https.crt /tmp/mock-https.key > /tmp/mock-https.log 2>&1 &
+          # Linux runners require elevated privileges to listen on port 443.
+          sudo -n python3 tests/business/mock_https.py /tmp/mock-https.crt /tmp/mock-https.key > /tmp/mock-https.log 2>&1 &
           MOCK_PID=$!
           trap 'kill "$PID" "$MOCK_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS --max-time 2 https://localhost/health > /dev/null 2>&1; then
+              break
+            fi
+            if ! kill -0 "$MOCK_PID" 2>/dev/null; then
+              cat /tmp/mock-https.log
+              exit 1
+            fi
+            sleep 0.3
+          done
+          curl -fsS --max-time 3 https://localhost/health
           start_api
           python3 -m unittest discover -s tests/business -p 'test_*.py' -v
 
