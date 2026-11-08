@@ -4,6 +4,7 @@ Only run in an isolated Development environment. Uses Python standard library.
 See .github/workflows/tests.yml for a reproducible CI environment.
 """
 import json
+from concurrent.futures import ThreadPoolExecutor
 import os
 import sys
 import time
@@ -329,6 +330,33 @@ class BusinessWorkflowTests(unittest.TestCase):
             "authScheme": None, "secret": None,
         })
         self.assertEqual(code, 400)
+
+
+
+    def test_16_concurrent_identical_starts_create_one_instance(self):
+        key, body = unique("racing-start"), purchase(2200)
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(
+                lambda _: start("purchase-approval", body, key=key), range(8)))
+        codes = [code for code, _ in results]
+        self.assertEqual(codes.count(202), 1, results)
+        self.assertTrue(all(code in (200, 202) for code in codes), results)
+        self.assertEqual(len({response["id"] for _, response in results}), 1)
+
+    def test_17_concurrent_task_completion_succeeds_only_once(self):
+        code, instance = start("purchase-approval", purchase(2201))
+        self.assertEqual(code, 202, instance)
+        wait_for(instance["id"], {"waiting-task"})
+        task = work_item(instance["id"], "manager@example.test")
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            results = list(pool.map(
+                lambda _: complete(task["id"], "approve", "manager@example.test"),
+                range(6)))
+        codes = [code for code, _ in results]
+        self.assertEqual(codes.count(200), 1, results)
+        self.assertTrue(all(code in (200, 409) for code in codes), results)
+        done = wait_for(instance["id"], {"completed"})
+        self.assertEqual(done["instance"]["outcome"], "approved")
 
 
 def prepare_restart(path):
