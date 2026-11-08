@@ -1,6 +1,6 @@
 # Business Workflow Engine
 
-[![Build](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/build.yml/badge.svg)](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/build.yml)
+[![Build](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/build.yml/badge.svg)](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/build.yml) [![Business tests](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/tests.yml/badge.svg)](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/tests.yml)
 
 An open-source, self-hostable workflow engine for defining and running business processes. The product direction includes a web workflow designer, role-based work routing, and HTTP integrations with external systems. Definitions specify their inputs, steps, routes, and outputs; instances persist progress and execution history.
 
@@ -26,7 +26,7 @@ The earlier purchase-specific routes remain as a compatibility/demo path. New pr
 - Angular 21
 - Modular monolith deployment
 
-Pull requests and pushes to `main` build the .NET API, Angular application, and production Docker Compose images in GitHub Actions. The workflow is a build gate; it does not currently run automated tests.
+Pull requests and pushes to `main` build the .NET API, Angular application, and production Docker Compose images in GitHub Actions. A separate [test workflow](.github/workflows/tests.yml) runs xUnit validation and PostgreSQL-backed business scenarios, including restart recovery and simulated HTTPS integrations. See the [verification report](docs/quality/verification.md) for test evidence and known gaps.
 
 ## Run locally
 
@@ -153,6 +153,7 @@ The API project's [`BusinessWorkflowEngine.Api.http`](src/server/BusinessWorkflo
 - [Workflow definition v1](docs/architecture/workflow-definition-v1.md)
 - [Domain model](docs/architecture/domain-model.md)
 - [Architecture](docs/architecture/overview.md)
+- [Verification report](docs/quality/verification.md)
 - [Architecture case study](docs/architecture/case-study.md)
 - [Repository structure](docs/architecture/repository-structure.md)
 - [Architecture decision records](docs/architecture/decisions/)
