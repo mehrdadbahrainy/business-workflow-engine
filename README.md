@@ -6,6 +6,8 @@ An open-source, self-hostable workflow engine for defining and running business 
 
 **Project status: early implementation.** The first generic execution slice now includes web definition authoring, role tasks, and configurable HTTP connections. It is not yet production-hardened or validated with target users.
 
+**Architecture case study:** [From a Business Request to a Durable Workflow Engine](docs/architecture/case-study.md) — the problem, the major decisions and trade-offs, execution and failure paths, and what remains unverified.
+
 ## What works today
 
 - Create workflow definitions in the browser, set input/output fields, connect supported nodes, add conditional routes, and publish immutable revisions.
@@ -151,6 +153,7 @@ The API project's [`BusinessWorkflowEngine.Api.http`](src/server/BusinessWorkflo
 - [Workflow definition v1](docs/architecture/workflow-definition-v1.md)
 - [Domain model](docs/architecture/domain-model.md)
 - [Architecture](docs/architecture/overview.md)
+- [Architecture case study](docs/architecture/case-study.md)
 - [Repository structure](docs/architecture/repository-structure.md)
 - [Architecture decision records](docs/architecture/decisions/)
 
