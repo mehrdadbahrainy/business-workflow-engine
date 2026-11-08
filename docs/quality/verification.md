@@ -2,8 +2,8 @@
 
 **Date:** 2026-11-08
 **Status:** Automated tests passed. This is not a production-readiness certification.
-**Tested revision:** db49272525075da222d77648b770cbf68122cff0
-**Evidence:** [Successful GitHub Actions run](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/runs/42513663051)
+**Tested revision:** 9e85f439297f12252b28fdcc43d7969821ee1944
+**Evidence:** [Successful GitHub Actions run](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/runs/42514309174)
 
 ## Environment and method
 
@@ -13,24 +13,27 @@ Tests run on a GitHub-hosted Ubuntu runner with .NET 10, real PostgreSQL 17, and
 
 | Test group | Coverage | Observed result |
 | --- | --- | --- |
-| Unit tests (10) | Both bundled definitions; distinct generic nodes; invalid roles, cycles, HTTP target, schemas, input fields, unsupported decision | 10 passed |
+| Unit tests (13) | Both bundled definitions; distinct generic nodes; invalid roles, cycles, HTTP target, schemas, input fields, unsupported decision | 13 passed |
 | Purchase approval | Under-threshold automatic outcome; manager approval and rejection; output and event timeline | Passed |
 | Leave workflow | Short request to team lead; extended request to department manager followed by HR | Passed |
 | Authentication and role boundary | Anonymous start rejected; unauthorized completion rejected; invalid and repeated completion rejected | Passed with Development identities |
-| Request idempotency | Repeated start returns same ID; different payload with same key gets conflict | Passed sequentially |
+| Request idempotency | Repeated and eight concurrent starts return the same ID; conflicting payload gets HTTP 409 | Passed sequentially |
 | Versioned definitions | Published definition cannot be overwritten | Passed |
 | Generic engine | New third workflow defined via API, published, and executed through two branches without code changes | Passed |
 | HTTPS action | Real request to local HTTPS fixture; mapped response; stable idempotency key received | Passed |
 | HTTP retry | First request returns 503, second succeeds; retry recorded | Passed |
 | HTTP exhaustion | Repeated 503 responses cause two retries, then a failed workflow | Passed |
 | Network destination policy | Connection to hostname not on allowlist is rejected | Passed |
+| Concurrent task completion | Six simultaneous requests to complete one pending task result in one success and five conflicts | Passed | 
+| Integration secret encryption | AES-GCM roundtrip, unique nonce, wrong key rejection, and invalid key rejection | Passed | 
 | Restart recovery | Pending work item survives stopping/restarting API and is completed afterward | Passed |
 
-**Measured suite result:** 10 xUnit tests + 15 API acceptance tests = **25 passing tests**, plus an additional successful restart check. No failures in the referenced completed CI run.
+**Measured suite result:** 13 xUnit tests + 17 API acceptance tests = **30 passing tests**, plus an additional successful restart check. No failures in the referenced completed CI run.
 
 ## Test sources and repeatability
 
-- [xUnit tests](../../tests/BusinessWorkflowEngine.Tests/WorkflowContractTests.cs)
+- [xUnit definition tests](../../tests/BusinessWorkflowEngine.Tests/WorkflowContractTests.cs)
+- [xUnit credential encryption tests](../../tests/BusinessWorkflowEngine.Tests/IntegrationCredentialTests.cs)
 - [Business acceptance tests](../../tests/business/test_workflows.py)
 - [Local HTTPS fixture](../../tests/business/mock_https.py)
 - [CI environment and commands](../../.github/workflows/tests.yml)
@@ -44,7 +47,7 @@ For API scenarios, the reference implementation is the CI workflow. Use only a d
 Passing tests demonstrate the behaviors exercised by this suite. They do **not** prove full reliability or production readiness. Unverified areas include:
 
 1. Production JWT/OIDC identity-provider integration and organization/tenant boundaries. Test identities are Development-only.
-2. Concurrent duplicate starts under contention and multiple worker instances claiming work simultaneously.
+2. Eight concurrent identical starts and six concurrent task completions passed. Higher concurrency, separate worker instances, and realistic load remain unverified.
 3. Database outages, interrupted transactions, point-in-time recovery, upgrade migrations, backup and restore, and rolling deployments.
 4. Real external idempotency. The local fixture captures the key but does not prove another business system deduplicates side effects.
 5. A crash after the external service acts but before the workflow records the acknowledgement.
