@@ -237,6 +237,100 @@ class BusinessWorkflowTests(unittest.TestCase):
             self.assertEqual(result["output"]["decision"], expected)
 
 
+
+    def create_http_process(self, remote_path):
+        connection = unique("connection")
+        code, details = api("POST", "/api/v1/integrations", body={
+            "key": connection, "name": "Local HTTPS fixture",
+            "baseUrl": "https://localhost/", "authHeaderName": None,
+            "authScheme": None, "secret": None,
+        })
+        self.assertEqual(code, 201, details)
+
+        name = unique("httptest")
+        definition = {
+            "schemaVersion": 1, "name": name, "revision": 1,
+            "title": "Outbound integration probe",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"reference": {"type": "string"}},
+                "required": ["reference"], "additionalProperties": False
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {"status": {"type": "string"},
+                               "attempt": {"type": "integer"},
+                               "idempotencyKey": {"type": "string"},
+                               "reference": {"type": "string"}},
+                "required": ["status", "attempt", "idempotencyKey", "reference"],
+                "additionalProperties": False
+            },
+            "roles": [],
+            "nodes": [
+                {"id": "start", "type": "start", "config": {},
+                 "transitions": [{"to": "send"}]},
+                {"id": "send", "type": "http",
+                 "config": {"integrationKey": connection, "method": "POST",
+                            "path": remote_path, "request": {"reference": "$.input.reference"}},
+                 "transitions": [{"to": "end"}]},
+                {"id": "end", "type": "end", "config": {
+                    "outcome": "delivered",
+                    "output": {
+                        "status": "$.actions.send.body.status",
+                        "attempt": "$.actions.send.body.attempt",
+                        "idempotencyKey": "$.actions.send.body.idempotencyKey",
+                        "reference": "$.actions.send.body.reference"
+                    }
+                }, "transitions": []}
+            ]
+        }
+        resource = "/api/v1/workflow-definitions/" + name + "/1"
+        code, response = api("PUT", resource, body=definition)
+        self.assertEqual(code, 200, response)
+        code, response = api("POST", resource + "/publish", body={})
+        self.assertEqual(code, 200, response)
+        return name
+
+    def test_12_http_integration_success_and_idempotency_header(self):
+        flow = self.create_http_process("/ok/" + unique("request"))
+        reference = unique("REF")
+        code, created = start(flow, {"reference": reference})
+        self.assertEqual(code, 202, created)
+        done = wait_for(created["id"], {"completed", "failed"}, timeout=25)
+        self.assertEqual(done["instance"]["status"], "completed", done)
+        self.assertEqual(done["output"]["status"], "ok")
+        self.assertEqual(done["output"]["attempt"], 1)
+        self.assertEqual(done["output"]["reference"], reference)
+        self.assertEqual(done["output"]["idempotencyKey"], created["id"] + ":send")
+
+    def test_13_transient_http_failure_is_retried(self):
+        flow = self.create_http_process("/retry/" + unique("request"))
+        code, created = start(flow, {"reference": unique("REF")})
+        self.assertEqual(code, 202, created)
+        done = wait_for(created["id"], {"completed", "failed"}, timeout=25)
+        self.assertEqual(done["instance"]["status"], "completed", done)
+        self.assertEqual(done["output"]["attempt"], 2)
+        self.assertIn("integration-retry-scheduled", [e["type"] for e in done["events"]])
+
+    def test_14_permanent_http_failure_ends_without_infinite_retry(self):
+        flow = self.create_http_process("/always-fail/" + unique("request"))
+        code, created = start(flow, {"reference": unique("REF")})
+        self.assertEqual(code, 202, created)
+        done = wait_for(created["id"], {"completed", "failed"}, timeout=30)
+        self.assertEqual(done["instance"]["status"], "failed", done)
+        self.assertEqual(
+            len([e for e in done["events"] if e["type"] == "integration-retry-scheduled"]), 2)
+        self.assertIn("integration-failed", [e["type"] for e in done["events"]])
+
+    def test_15_connection_rejects_unapproved_destination(self):
+        code, _ = api("POST", "/api/v1/integrations", body={
+            "key": unique("blocked"), "name": "Not allowlisted",
+            "baseUrl": "https://example.com/", "authHeaderName": None,
+            "authScheme": None, "secret": None,
+        })
+        self.assertEqual(code, 400)
+
+
 def prepare_restart(path):
     status, created = start("purchase-approval", purchase(2300))
     if status != 202:
