@@ -320,7 +320,7 @@ class BusinessWorkflowTests(unittest.TestCase):
         self.assertEqual(done["instance"]["status"], "failed", done)
         self.assertEqual(
             len([e for e in done["events"] if e["type"] == "integration-retry-scheduled"]), 2)
-        self.assertIn("integration-failed", [e["type"] for e in done["events"]])
+        self.assertIn("workflow-failed", [e["type"] for e in done["events"]])
 
     def test_15_connection_rejects_unapproved_destination(self):
         code, _ = api("POST", "/api/v1/integrations", body={
