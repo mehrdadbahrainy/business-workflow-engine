@@ -401,6 +401,35 @@ class BusinessWorkflowTests(unittest.TestCase):
         status, _ = get_instance(created["id"], actor="manager@example.test")
         self.assertEqual(status, 200)
 
+    def test_22_auth_bootstrap_and_verified_demo_identity(self):
+        status, config = api("GET", "/api/v1/auth/config", actor=None)
+        self.assertEqual(status, 200, config)
+        self.assertEqual(config["mode"], "demo")
+        self.assertIsNone(config["authority"])
+        status, _ = api("GET", "/api/v1/auth/me", actor=None)
+        self.assertEqual(status, 401)
+        status, me = api("GET", "/api/v1/auth/me", actor="manager@example.test")
+        self.assertEqual(status, 200, me)
+        self.assertEqual(me["subject"], "manager@example.test")
+        self.assertIn("manager", me["roles"])
+        self.assertIn("workflow-admin", me["roles"])
+
+    def test_23_authorized_connection_head_probe(self):
+        key = unique("test-head")
+        status, saved = api("POST", "/api/v1/integrations", body={
+            "key": key, "name": "Read-only HEAD fixture", "baseUrl": "https://localhost/",
+            "authHeaderName": None, "authScheme": None, "secret": None
+        })
+        self.assertEqual(status, 201, saved)
+        path = "/api/v1/integrations/" + key + "/test"
+        status, probe = api("POST", path, body={})
+        self.assertEqual(status, 200, probe)
+        self.assertTrue(probe["reachable"])
+        self.assertEqual(probe["statusCode"], 200)
+        self.assertEqual(probe["credentialStatus"], "unverified")
+        status, _ = api("POST", path, actor=None, body={})
+        self.assertEqual(status, 401)
+
 
 def prepare_restart(path):
     status, created = start("purchase-approval", purchase(2300))
