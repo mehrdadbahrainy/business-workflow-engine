@@ -1,4 +1,3 @@
-
 @if (!auth.ready) {
   <main class="access-screen loading-screen">
     <section class="access-card">
@@ -54,6 +53,8 @@
           <button class="button primary access-submit" type="button" (click)="signIn()">Sign in with your organization <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
           @if (auth.registrationUrl) {
             <p class="access-signup">New here? <a [href]="auth.registrationUrl" rel="noopener noreferrer">Create an account with your identity provider</a></p>
+          } @else if (auth.registrationHint) {
+            <p class="access-signup">{{ auth.registrationHint }}</p>
           } @else {
             <p class="access-signup">Need an account? Contact your organization's identity administrator to request access.</p>
           }

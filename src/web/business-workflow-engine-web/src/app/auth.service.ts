@@ -7,6 +7,7 @@ interface BrowserAuthConfig {
   clientId: string | null;
   scope: string;
   registrationUrl: string | null;
+  registrationHint?: string | null;
 }
 export interface AuthenticatedUser {
   subject: string;
@@ -65,6 +66,7 @@ export class AuthService {
 
   get isDemo(): boolean { return this.mode === 'demo'; }
   get registrationUrl(): string | null { return this.config?.registrationUrl ?? null; }
+  get registrationHint(): string | null { return this.config?.registrationHint ?? null; }
   get configured(): boolean {
     return this.isDemo || !!(this.config?.authority && this.config.clientId);
   }

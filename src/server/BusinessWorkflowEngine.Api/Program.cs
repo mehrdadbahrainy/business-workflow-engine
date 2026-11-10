@@ -40,7 +40,21 @@ else
         options.MapInboundClaims = false;
         options.Authority = authority;
         options.Audience = audience;
-        options.RequireHttpsMetadata = true;
+        // Only the isolated, loopback-bound local Compose profile uses HTTP metadata.
+        // Production ALWAYS requires HTTPS and never accepts a metadata override.
+        var localOidc = builder.Environment.IsEnvironment("Local");
+        options.RequireHttpsMetadata = !localOidc;
+        if (localOidc)
+        {
+            var internalMetadata = builder.Configuration["Authentication:MetadataAddress"];
+            if (string.IsNullOrWhiteSpace(internalMetadata)
+                || !Uri.TryCreate(internalMetadata, UriKind.Absolute, out var metadataUri)
+                || metadataUri.Scheme != Uri.UriSchemeHttp
+                || metadataUri.Host != "keycloak"
+                || !metadataUri.AbsolutePath.EndsWith("/.well-known/openid-configuration", StringComparison.Ordinal))
+                throw new InvalidOperationException("Local OIDC requires an internal Keycloak metadata URL.");
+            options.MetadataAddress = internalMetadata;
+        }
         options.TokenValidationParameters.RoleClaimType = builder.Configuration["Authentication:RoleClaimType"] ?? ClaimTypes.Role;
     });
 }

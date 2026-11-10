@@ -1,0 +1,89 @@
+# Clone-and-run local demo with real OIDC sign-in.
+# SECURITY: development credentials, plaintext HTTP and Keycloak dev database.
+# Every published port is bound to this machine's loopback interface.
+# NEVER deploy this file to a public host.
+name: flowforge-local
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: workflow_engine
+      POSTGRES_USER: workflow_engine
+      POSTGRES_PASSWORD: local-workflow-db-only
+    volumes:
+      - workflow-postgres-local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workflow_engine -d workflow_engine"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3.5
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: local-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: local-admin-change-me
+      KC_HOSTNAME: http://localhost:8081
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+    volumes:
+      - ./deploy/keycloak/flowforge-realm.json:/opt/keycloak/data/import/flowforge-realm.json:ro
+      - flowforge-keycloak-local:/opt/keycloak/data
+    ports:
+      - "127.0.0.1:8081:8080"
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\r\n\r\n' >&3 && IFS= read -r response <&3 && [[ \"$$response\" == *200* ]]"
+      interval: 8s
+      timeout: 4s
+      start_period: 65s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/api.Dockerfile
+    environment:
+      # Not Development: execute the real OIDC/JWT path.
+      ASPNETCORE_ENVIRONMENT: Local
+      ConnectionStrings__WorkflowDatabase: Host=postgres;Port=5432;Database=workflow_engine;Username=workflow_engine;Password=local-workflow-db-only
+      Authentication__Authority: http://localhost:8081/realms/flowforge
+      Authentication__MetadataAddress: http://keycloak:8080/realms/flowforge/.well-known/openid-configuration
+      Authentication__Audience: business-workflow-engine
+      Authentication__ClientId: flowforge-web
+      Authentication__Scope: openid profile email
+      Authentication__RoleClaimType: role
+      Workflow__AdminRole: workflow-admin
+      Integrations__AllowedHosts: ""
+      Integrations__EncryptionKey: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "dotnet", "--info"]
+      interval: 15s
+      timeout: 8s
+      retries: 4
+      start_period: 15s
+
+  web:
+    build:
+      context: src/web/business-workflow-engine-web
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  workflow-postgres-local:
+  flowforge-keycloak-local:

@@ -18,7 +18,10 @@ public static class AuthenticationEndpoints
                 authority = environment.IsDevelopment() ? null : config["Authentication:Authority"],
                 clientId = environment.IsDevelopment() ? null : config["Authentication:ClientId"],
                 scope = config["Authentication:Scope"] ?? "openid profile email",
-                registrationUrl = safeRegistrationUrl
+                registrationUrl = safeRegistrationUrl,
+                registrationHint = environment.IsEnvironment("Local")
+                    ? "New user? Select Register on the Keycloak login page."
+                    : null
             });
         }).AllowAnonymous().WithTags("Authentication").WithName("GetAuthenticationConfig");
 
