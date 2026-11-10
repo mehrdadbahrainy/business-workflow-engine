@@ -70,7 +70,7 @@ test.describe('@oidc local Keycloak quickstart', () => {
     await page.goto('/');
     await page.getByRole('button', { name: /Sign in with your organization/ }).click();
     await page.getByRole('link', { name: /Register/i }).click();
-    await expect(page).toHaveURL(/localhost:8081\\/);
+    await expect(page).toHaveURL(/localhost:8081/);
     await page.locator('#firstName').fill('Demo');
     await page.locator('#lastName').fill('Registration');
     await page.locator('#email').fill(email);
