@@ -26,3 +26,8 @@ workflow-engine-backup-*.dump
 !.vscode/tasks.json
 .DS_Store
 Thumbs.db
+
+# Playwright E2E
+**/test-results/
+**/playwright-report/
+**/blob-report/
