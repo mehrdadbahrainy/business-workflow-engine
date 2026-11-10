@@ -54,6 +54,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapHealthEndpoints();
+app.MapAuthenticationEndpoints();
 app.UseAuthentication();
 app.UseAuthorization();
 await app.InitializeAsync();
