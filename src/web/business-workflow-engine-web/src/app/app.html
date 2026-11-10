@@ -202,7 +202,7 @@
                     <div class="node-transition">@if (node.type !== 'gateway') { <label>Next step<select [(ngModel)]="node.transitions[0].to" [name]="node.id + '-next'">@for (target of transitionTargetNames(); track target) { @if (target !== node.id) { <option [value]="target">{{ target }}</option> } }</select></label> }</div>
                   }
                 </article>
-                @if (i < definitionDraft.nodes.length - 1) { <div class="flow-connector" aria-hidden="true"><span>â†“</span></div> }
+                @if (i < definitionDraft.nodes.length - 1) { <div class="flow-connector" aria-hidden="true"><svg class="ui-icon flow-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><use href="/icons/lucide-sprite.svg#arrow-down"></use></svg></div> }
               }
             </div>
           </article>
