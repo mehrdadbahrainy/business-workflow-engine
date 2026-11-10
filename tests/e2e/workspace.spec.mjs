@@ -67,7 +67,7 @@ test('author publishes and runs a workflow from the browser', async ({ page }) =
   await expect(card).toContainText('published');
   const instance = await startWorkflow(page, slug, {});
   await awaitOutcome(page, instance, 'completed');
-  await expect(page.locator('.detail-panel')).toContainText('workflow-completed');
+  await expect(page.locator('.detail-panel')).toContainText('workflow completed');
 });
 
 test('role-assigned work is completed by team lead and shown to requester', async ({ page }) => {
