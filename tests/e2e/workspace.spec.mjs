@@ -161,3 +161,47 @@ test('typography remains readable on desktop and mobile', async ({ page }) => {
   }));
   expect(widths.document).toBeLessThanOrEqual(widths.viewport + 4);
 });
+
+test('Lucide icons resolve from a local SVG sprite with no CDN dependency', async ({ page }) => {
+  const remoteIconRequests = [];
+  page.on('request', request => {
+    const url = request.url();
+    if (url.includes('lucide-sprite.svg') && !url.startsWith('http://127.0.0.1:4200/')) {
+      remoteIconRequests.push(url);
+    }
+  });
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Explore the development workspace' })).toBeVisible();
+
+  async function assertIconsResolve() {
+    return page.evaluate(async () => {
+      const uses = [...document.querySelectorAll('svg.ui-icon use')];
+      const references = uses.map(node => node.getAttribute('href'));
+      const response = await fetch('/icons/lucide-sprite.svg', { cache: 'no-store' });
+      if (!response.ok) return { status: response.status, references: references.length, missing: ['asset'] };
+      const xml = new DOMParser().parseFromString(await response.text(), 'image/svg+xml');
+      if (xml.querySelector('parsererror')) return { status: 200, references: references.length, missing: ['malformed XML'] };
+      const missing = references.filter(reference => {
+        if (!reference?.startsWith('/icons/lucide-sprite.svg#')) return true;
+        const id = reference.split('#')[1];
+        const target = [...xml.querySelectorAll('symbol')].find(symbol => symbol.id === id);
+        return !target || !target.children.length;
+      });
+      return { status: response.status, references: references.length, missing };
+    });
+  }
+
+  let icons = await assertIconsResolve();
+  expect(icons.status).toBe(200);
+  expect(icons.references).toBeGreaterThan(0);
+  expect(icons.missing).toEqual([]);
+
+  await enterDemo(page);
+  icons = await assertIconsResolve();
+  expect(icons.references).toBeGreaterThan(6);
+  expect(icons.missing).toEqual([]);
+  await page.getByRole('button', { name: 'Connections' }).click();
+  icons = await assertIconsResolve();
+  expect(icons.missing).toEqual([]);
+  expect(remoteIconRequests).toEqual([]);
+});
