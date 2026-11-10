@@ -132,3 +132,31 @@ test('mobile viewport preserves navigation and does not overflow', async ({ page
   expect(widths.document).toBeLessThanOrEqual(widths.viewport + 4);
   await expect(page.getByRole('button', { name: /New connection/ })).toBeVisible();
 });
+
+test('typography remains readable on desktop and mobile', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Explore the development workspace' })).toBeVisible();
+  const size = async (selector) => Number.parseFloat(await page.locator(selector).first().evaluate(
+    element => getComputedStyle(element).fontSize
+  ));
+  expect(await size('.access-intro')).toBeGreaterThanOrEqual(16);
+  expect(await size('.access-submit')).toBeGreaterThanOrEqual(16);
+  expect(await size('.access-signup')).toBeGreaterThanOrEqual(14);
+  await enterDemo(page);
+  expect(await size('nav button')).toBeGreaterThanOrEqual(14);
+  expect(await size('.workflow-card>p')).toBeGreaterThanOrEqual(14);
+  expect(await size('.card-title h2')).toBeGreaterThanOrEqual(18);
+  expect(await size('.card-meta')).toBeGreaterThanOrEqual(12);
+  await page.getByRole('button', { name: /New workflow/ }).click();
+  expect(await size('.settings-grid input')).toBeGreaterThanOrEqual(16);
+  expect(await size('.node-body input')).toBeGreaterThanOrEqual(16);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await size('nav button')).toBeGreaterThanOrEqual(14);
+  expect(await size('.settings-grid input')).toBeGreaterThanOrEqual(16);
+  const widths = await page.evaluate(() => ({
+    document: document.documentElement.scrollWidth,
+    viewport: window.innerWidth
+  }));
+  expect(widths.document).toBeLessThanOrEqual(widths.viewport + 4);
+});
