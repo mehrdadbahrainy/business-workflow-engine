@@ -21,6 +21,45 @@ An open-source, self-hostable workflow engine for defining and running business 
 
 The earlier purchase-specific routes remain as a compatibility/demo path. New process behavior belongs in versioned definitions and generic runtime code.
 
+## Quickstart: Docker + Keycloak (recommended)
+
+**Start from a fresh clone with Docker Desktop or Docker Engine + Compose.** You do not need to
+install .NET, Node.js or Keycloak on your computer. This local-only stack runs real OIDC login
+through an included Keycloak realm, together with PostgreSQL, the .NET API and the Angular web app.
+
+```bash
+git clone https://github.com/mehrdadbahrainy/business-workflow-engine.git
+cd business-workflow-engine
+docker compose -f compose.local.yaml up -d --build --wait --wait-timeout 300
+```
+
+Then open **http://localhost:8080**. Choose **Sign in with your organization** and enter:
+
+| Local demo account | Password | Permissions |
+| --- | --- | --- |
+| `flowadmin` | `DevOnly123!` | Workflow admin and purchase manager |
+| `requester` | `DevOnly123!` | Run workflows and see own instances |
+| `teamlead` | `DevOnly123!` | Complete team-lead tasks |
+
+To **create a new user**, choose **Register** on the Keycloak login screen. For role assignment
+and user administration, open **http://localhost:8081/admin/** and use
+`local-admin` / `local-admin-change-me`; select realm **flowforge** → **Users**.
+The self-registered account does not automatically receive admin rights.
+
+Stop without deleting databases:
+
+```bash
+docker compose -f compose.local.yaml down
+```
+
+**This is a development stack, not a secure deployment.** All ports bind to 127.0.0.1,
+but the demo passwords, Keycloak dev storage and HTTP login are unsafe for public access.
+Do not deploy it to an internet-facing host or reuse its credentials in production.
+See the [step-by-step local quickstart](docs/operations/local-quickstart.md) for screenshots-independent
+instructions, errors, roles, volume persistence and troubleshooting. The existing
+[production Compose file](compose.production.yaml) remains separate and requires proper
+HTTPS OIDC configuration and secrets.
+
 ## Technology
 
 - .NET 10 / ASP.NET Core Minimal APIs
@@ -40,7 +79,7 @@ reachability, and a mobile viewport smoke check.
 
 See [tests/e2e/README.md](tests/e2e/README.md) for local prerequisites and the
 [CI run history](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/e2e.yml).
-This is **Development-mode E2E**. It does not certify production OIDC onboarding,
+Development-mode browser E2E is supplemented by an OIDC browser suite against the local Keycloak Docker stack, described in [local quickstart](docs/operations/local-quickstart.md). Neither local test mode certifies production OIDC onboarding,
 registration, MFA, or session federation. These must be checked with a staging identity
 provider before the authentication-related PR can be safely merged.
 
@@ -73,9 +112,9 @@ Open the Angular dev-server URL shown in the terminal. Its `/api` requests proxy
 
 The API's OpenAPI document is available at `http://localhost:5195/openapi/v1.json` while running in Development. It describes the HTTP operations, the required `Idempotency-Key` header, and the Development-only `X-Demo-User` authentication scheme; OpenAPI is not exposed by the production configuration.
 
-## Self-host with Docker Compose
+## Production self-hosting with an existing identity provider
 
-The production Compose stack runs PostgreSQL, the .NET API, and the Angular operations UI as separate containers. It requires an existing OIDC-compatible identity provider; the engine validates bearer tokens but does not issue them or manage user accounts.
+The **production** Compose stack (different from `compose.local.yaml`) runs PostgreSQL, the .NET API, and the Angular operations UI as separate containers. It requires an existing OIDC-compatible identity provider; the engine validates bearer tokens but does not issue them or manage user accounts.
 
 ```powershell
 Copy-Item .env.example .env
