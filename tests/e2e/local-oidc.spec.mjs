@@ -15,7 +15,16 @@ test.describe('@oidc local Keycloak quickstart', () => {
     await page.locator('#password').fill('DevOnly123!');
     await page.locator('#kc-login').click();
     await expect(page).toHaveURL(/^http:\/\/localhost:8080\/?$/);
-    await expect(page.getByRole('heading', { name: 'Workflows', exact: true })).toBeVisible();
+    const workflows = page.getByRole('heading', { name: 'Workflows', exact: true });
+    if (!(await workflows.isVisible())) {
+      console.log('OIDC_AFTER_LOGIN_PAGE:', (await page.locator('body').innerText()).slice(0, 2500));
+      console.log('OIDC_URL:', page.url());
+      console.log('OIDC_BROWSER_AUTH:', await page.evaluate(() => ({
+        tokenPresent: !!sessionStorage.getItem('flowforge-access-token'),
+        expirationPresent: !!sessionStorage.getItem('flowforge-token-expires-at')
+      })));
+    }
+    await expect(workflows).toBeVisible();
   }
 
   async function verifiedIdentity(page) {

@@ -69,6 +69,10 @@ jobs:
         working-directory: tests/e2e
         run: ./node_modules/.bin/playwright test local-oidc.spec.mjs
 
+      - name: Show API and Keycloak diagnostics on failed OIDC tests
+        if: failure()
+        run: docker compose -f compose.local.yaml logs --no-color --tail=140 api keycloak
+
       - name: Collect troubleshooting logs and browser artifacts
         if: always()
         run: docker compose -f compose.local.yaml logs --no-color > /tmp/flowforge-local-compose.log 2>&1 || true
