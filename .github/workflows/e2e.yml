@@ -1,0 +1,126 @@
+name: Browser E2E · Chromium
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-e2e:
+    name: Chromium + Angular + .NET + PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: workflow_engine
+          POSTGRES_PASSWORD: workflow_engine
+          POSTGRES_DB: workflow_engine
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U workflow_engine -d workflow_engine"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__WorkflowDatabase: "Host=127.0.0.1;Port=5432;Database=workflow_engine;Username=workflow_engine;Password=workflow_engine"
+      Integrations__AllowedHosts: localhost
+      E2E_BASE_URL: http://127.0.0.1:4200
+      CI: "true"
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/web/business-workflow-engine-web/package-lock.json
+
+      - name: Build API
+        run: dotnet build src/server/BusinessWorkflowEngine.Api/BusinessWorkflowEngine.Api.csproj -c Release
+
+      - name: Install Angular and Playwright
+        run: |
+          npm ci --prefix src/web/business-workflow-engine-web
+          npm install --prefix tests/e2e --ignore-scripts --no-package-lock --no-audit --no-fund
+
+      - name: Install Chromium
+        run: ./tests/e2e/node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Run Chromium against isolated API, database and TLS fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          API_PID=""
+          WEB_PID=""
+          MOCK_PID=""
+          cleanup() {
+            for pid in "$API_PID" "$WEB_PID" "$MOCK_PID"; do
+              if [ -n "$pid" ]; then sudo kill "$pid" 2>/dev/null || true; fi
+            done
+          }
+          trap cleanup EXIT
+
+          # Disposable loopback TLS fixture; no production credentials or live calls.
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+            -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost" \
+            -keyout /tmp/e2e-local.key -out /tmp/e2e-local.crt > /dev/null 2>&1
+          sudo cp /tmp/e2e-local.crt /usr/local/share/ca-certificates/flowforge-e2e.crt
+          sudo update-ca-certificates > /dev/null
+          sudo -n python3 tests/business/mock_https.py /tmp/e2e-local.crt /tmp/e2e-local.key > /tmp/e2e-mock.log 2>&1 &
+          MOCK_PID=$!
+
+          dotnet src/server/BusinessWorkflowEngine.Api/bin/Release/net10.0/BusinessWorkflowEngine.Api.dll \
+            --urls http://127.0.0.1:5195 > /tmp/e2e-api.log 2>&1 &
+          API_PID=$!
+
+          npm --prefix src/web/business-workflow-engine-web run start -- \
+            --host 127.0.0.1 --port 4200 > /tmp/e2e-web.log 2>&1 &
+          WEB_PID=$!
+
+          # Distinguish failed startup from a browser assertion.
+          for attempt in $(seq 1 90); do
+            if curl -fsS --max-time 2 http://127.0.0.1:5195/readyz > /dev/null 2>&1 \
+              && curl -fsS --max-time 2 http://127.0.0.1:4200/ > /dev/null 2>&1 \
+              && curl -fsS --max-time 2 https://localhost/health > /dev/null 2>&1; then
+              break
+            fi
+            if ! kill -0 "$API_PID" 2>/dev/null || ! kill -0 "$WEB_PID" 2>/dev/null || ! sudo kill -0 "$MOCK_PID" 2>/dev/null; then
+              cat /tmp/e2e-api.log /tmp/e2e-web.log /tmp/e2e-mock.log
+              echo "An E2E service exited before tests started." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:5195/readyz
+          curl -fsS http://127.0.0.1:4200/ > /dev/null
+          curl -fsS https://localhost/health
+          cd tests/e2e
+          npm test
+
+      - name: Upload browser traces and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e-evidence
+          retention-days: 10
+          if-no-files-found: ignore
+          path: |
+            tests/e2e/playwright-report/
+            tests/e2e/test-results/
+            /tmp/e2e-api.log
+            /tmp/e2e-web.log
+            /tmp/e2e-mock.log
