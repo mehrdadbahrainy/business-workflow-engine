@@ -43,14 +43,14 @@ class TextEncodingTests(unittest.TestCase):
         self.assertEqual(len(issues), 1)
 
     def test_non_utf8_bytes_fail(self):
-        self.tracked("layout.scss", b".icon { content: '\\xff'; }")
+        self.tracked("layout.scss", b".icon " + bytes([0xff]))
         _, issues = guard.check(self.root)
         self.assertEqual(len(issues), 1)
         self.assertIn("invalid UTF-8", issues[0])
 
     def test_untracked_artifacts_are_ignored(self):
         self.tracked("valid.cs", b"class Valid {}")
-        (self.root / "scratch.html").write_bytes(b"\\xff")
+        (self.root / "scratch.html").write_bytes(bytes([0xff]))
         _, issues = guard.check(self.root)
         self.assertEqual(issues, [])
 
