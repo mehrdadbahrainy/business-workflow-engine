@@ -35,6 +35,11 @@ jobs:
           cache: npm
           cache-dependency-path: src/web/business-workflow-engine-web/package-lock.json
 
+      - name: Detect corrupted text encoding before building
+        run: |
+          python3 -m unittest discover -s tests/quality -v
+          python3 scripts/check_text_encoding.py
+
       - name: Restore .NET packages
         run: dotnet restore BusinessWorkflowEngine.sln
 

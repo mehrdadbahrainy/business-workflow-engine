@@ -205,3 +205,22 @@ test('Lucide icons resolve from a local SVG sprite with no CDN dependency', asyn
   expect(icons.missing).toEqual([]);
   expect(remoteIconRequests).toEqual([]);
 });
+
+test('workflow node connectors use local Lucide arrows, not broken text glyphs', async ({ page }) => {
+  await page.goto('/');
+  await enterDemo(page);
+  const card = page.locator('.workflow-card').filter({ hasText: 'purchase-approval' });
+  await card.getByRole('button', { name: 'Edit new revision' }).click();
+  const connectors = page.locator('.flow-connector');
+  await expect(connectors.first()).toBeVisible();
+  expect(await connectors.count()).toBeGreaterThan(2);
+  await expect(connectors.locator('svg use[href="/icons/lucide-sprite.svg#arrow-down"]')).toHaveCount(await connectors.count());
+  const contents = await connectors.allTextContents();
+  expect(contents.every(s => s.trim() === '')).toBe(true);
+  const symbol = await page.evaluate(async () => {
+    const response = await fetch('/icons/lucide-sprite.svg');
+    const document = new DOMParser().parseFromString(await response.text(), 'image/svg+xml');
+    return { status: response.status, exists: !![...document.querySelectorAll('symbol')].find(el => el.id === 'arrow-down' && el.children.length) };
+  });
+  expect(symbol).toEqual({ status: 200, exists: true });
+});
