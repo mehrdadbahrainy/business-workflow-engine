@@ -1,0 +1,91 @@
+name: Local Docker quickstart + real Keycloak OIDC
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-oidc:
+    name: Docker Compose + Keycloak + Chromium login
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: "true"
+      E2E_BASE_URL: http://localhost:8080
+      E2E_MODE: oidc
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Validate local Compose configuration and imported realm
+        run: |
+          docker compose -f compose.local.yaml config --quiet
+          python3 -m json.tool deploy/keycloak/flowforge-realm.json > /dev/null
+          python3 - <<'PY'
+          import json
+          realm = json.load(open('deploy/keycloak/flowforge-realm.json', encoding='utf8'))
+          assert realm['realm'] == 'flowforge'
+          client = next(x for x in realm['clients'] if x['clientId'] == 'flowforge-web')
+          assert client['publicClient'] and not client['directAccessGrantsEnabled']
+          assert client['attributes']['pkce.code.challenge.method'] == 'S256'
+          assert 'http://localhost:8080/auth/callback' in client['redirectUris']
+          print('Realm import structure and SPA callback verified')
+          PY
+
+      - name: Start full local stack from a clean checkout
+        run: docker compose -f compose.local.yaml up -d --build --wait --wait-timeout 300
+
+      - name: Probe browser config, public issuer and internal readiness
+        run: |
+          set -euo pipefail
+          curl -fsS http://localhost:8080/readyz
+          curl -fsS http://localhost:8080/api/v1/auth/config > /tmp/flowforge-local-auth.json
+          curl -fsS http://localhost:8081/realms/flowforge/.well-known/openid-configuration > /tmp/flowforge-local-oidc.json
+          python3 - <<'PY'
+          import json
+          c = json.load(open('/tmp/flowforge-local-auth.json', encoding='utf8'))
+          d = json.load(open('/tmp/flowforge-local-oidc.json', encoding='utf8'))
+          assert c['mode'] == 'oidc', c
+          assert c['authority'] == d['issuer'] == 'http://localhost:8081/realms/flowforge', (c, d)
+          assert c['clientId'] == 'flowforge-web', c
+          print('OIDC browser config, Keycloak issuer and API readiness OK')
+          PY
+
+      - name: Install Playwright and Chromium
+        run: |
+          npm install --prefix tests/e2e --ignore-scripts --no-package-lock --no-audit --no-fund
+          ./tests/e2e/node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Exercise real Keycloak sign-in, authorization and user registration entry
+        working-directory: tests/e2e
+        run: ./node_modules/.bin/playwright test local-oidc.spec.mjs
+
+      - name: Collect troubleshooting logs and browser artifacts
+        if: always()
+        run: docker compose -f compose.local.yaml logs --no-color > /tmp/flowforge-local-compose.log 2>&1 || true
+
+      - name: Upload test results and stack logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-keycloak-e2e-evidence
+          retention-days: 7
+          if-no-files-found: ignore
+          path: |
+            tests/e2e/playwright-report/
+            tests/e2e/test-results/
+            /tmp/flowforge-local-compose.log
+            /tmp/flowforge-local-oidc.json
+
+      - name: Stop disposable local stack
+        if: always()
+        run: docker compose -f compose.local.yaml down -v --remove-orphans
