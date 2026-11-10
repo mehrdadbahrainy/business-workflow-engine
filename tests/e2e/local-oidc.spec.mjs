@@ -15,16 +15,7 @@ test.describe('@oidc local Keycloak quickstart', () => {
     await page.locator('#password').fill('DevOnly123!');
     await page.locator('#kc-login').click();
     await expect(page).toHaveURL(/^http:\/\/localhost:8080\/?$/);
-    const workflows = page.getByRole('heading', { name: 'Workflows', exact: true });
-    if (!(await workflows.isVisible())) {
-      console.log('OIDC_AFTER_LOGIN_PAGE:', (await page.locator('body').innerText()).slice(0, 2500));
-      console.log('OIDC_URL:', page.url());
-      console.log('OIDC_BROWSER_AUTH:', await page.evaluate(() => ({
-        tokenPresent: !!sessionStorage.getItem('flowforge-access-token'),
-        expirationPresent: !!sessionStorage.getItem('flowforge-token-expires-at')
-      })));
-    }
-    await expect(workflows).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Workflows', exact: true })).toBeVisible();
   }
 
   async function verifiedIdentity(page) {
@@ -71,6 +62,28 @@ test.describe('@oidc local Keycloak quickstart', () => {
       return response.status;
     });
     expect(result).toBe(403);
+  });
+
+  test('new visitor can self-register in Keycloak and start a session', async ({ page }) => {
+    const username = 'newuser-' + Math.random().toString(36).slice(2, 10);
+    const email = username + '@example.test';
+    await page.goto('/');
+    await page.getByRole('button', { name: /Sign in with your organization/ }).click();
+    await page.getByRole('link', { name: /Register/i }).click();
+    await expect(page).toHaveURL(/localhost:8081\\/);
+    await page.locator('#firstName').fill('Demo');
+    await page.locator('#lastName').fill('Registration');
+    await page.locator('#email').fill(email);
+    await page.locator('#username').fill(username);
+    await page.locator('#password').fill('NewLocal123!');
+    await page.locator('#password-confirm').fill('NewLocal123!');
+    await page.locator('input[type="submit"], button[type="submit"]').first().click();
+    await expect(page).toHaveURL(/^http:\/\/localhost:8080\/?$/);
+    await expect(page.getByRole('heading', { name: 'Workflows', exact: true })).toBeVisible();
+    const me = await verifiedIdentity(page);
+    expect(me.status).toBe(200);
+    expect(me.body.subject).toBeTruthy();
+    expect(me.body.roles).not.toContain('workflow-admin');
   });
 
   test('Keycloak sign-in provides an account registration entry point', async ({ page }) => {
