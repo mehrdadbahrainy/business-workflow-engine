@@ -13,6 +13,7 @@ public static partial class WorkflowIntegrationEndpoints
         var api = endpoints.MapGroup("/api/v1/integrations").RequireAuthorization();
         api.MapGet("", List).WithName("ListWorkflowIntegrations").WithTags("Integrations");
         api.MapPost("", Create).WithName("CreateWorkflowIntegration").WithTags("Integrations").RequireAuthorization("WorkflowAuthor").Produces(StatusCodes.Status400BadRequest).Produces(StatusCodes.Status409Conflict);
+        api.MapPost("/{key}/test", TestConnection).WithName("TestWorkflowIntegration").WithTags("Integrations").RequireAuthorization("WorkflowAuthor");
         api.MapPut("/{key}", Update).WithName("UpdateWorkflowIntegration").WithTags("Integrations").RequireAuthorization("WorkflowAuthor").Produces(StatusCodes.Status400BadRequest).Produces(StatusCodes.Status404NotFound);
         return endpoints;
     }
@@ -71,6 +72,61 @@ public static partial class WorkflowIntegrationEndpoints
         integration.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         return Results.Ok(ToResponse(integration));
+    }
+
+
+    // A HEAD probe tests reachability, never executes user-selected methods or writes.
+    // It intentionally cannot prove that a credential is accepted for every downstream route.
+    private static async Task<IResult> TestConnection(
+        string key, WorkflowDbContext db, IHttpClientFactory clients,
+        WorkflowIntegrationSecretProtector protector, IOptions<WorkflowIntegrationOptions> options,
+        CancellationToken cancellationToken)
+    {
+        var integration = await db.WorkflowIntegrationConnections.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Key == key, cancellationToken);
+        if (integration is null) return Results.NotFound(new { error = "Connection not found." });
+        if (!TryNormalizeBaseUrl(integration.BaseUrl, options.Value, out var baseUrl, out _))
+            return Results.BadRequest(new { error = "This connection host is not allowed. Ask the administrator to update INTEGRATION_ALLOWED_HOSTS." });
+
+        using var request = new HttpRequestMessage(HttpMethod.Head, baseUrl);
+        try
+        {
+            if (integration.ProtectedSecret is not null)
+            {
+                var secret = protector.Unprotect(integration.ProtectedSecret);
+                if (integration.AuthHeaderName?.Equals("Authorization", StringComparison.OrdinalIgnoreCase) == true)
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(integration.AuthScheme!, secret);
+                else if (integration.AuthHeaderName is not null)
+                    request.Headers.TryAddWithoutValidation(integration.AuthHeaderName, secret);
+            }
+            using var response = await clients.CreateClient("workflow-integrations")
+                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            var code = (int)response.StatusCode;
+            var message = code is 401 or 403
+                ? "The server responded but rejected the request or credential."
+                : code == 405
+                    ? "The server is reachable, but it does not support HEAD. Credential validity was not verified."
+                    : code >= 500
+                        ? "The server is reachable but returned an error."
+                        : "The server responded. This does not guarantee that workflow operations are authorized.";
+            return Results.Ok(new { reachable = true, statusCode = code, credentialStatus = code is 401 or 403 ? "rejected" : "unverified", message });
+        }
+        catch (System.Security.Cryptography.CryptographicException)
+        {
+            return Results.Problem("Unable to decrypt the stored credential. Check the deployment encryption key.", statusCode: 503);
+        }
+        catch (InvalidOperationException)
+        {
+            return Results.Problem("Integration credential encryption is not configured.", statusCode: 503);
+        }
+        catch (HttpRequestException)
+        {
+            return Results.Problem("Could not connect to the allowed HTTPS host. Check DNS, TLS and network access.", statusCode: 502);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return Results.Problem("The connection probe timed out.", statusCode: 504);
+        }
     }
 
     private static bool TryNormalizeBaseUrl(string? value, WorkflowIntegrationOptions options, out string normalized, out string error)

@@ -30,6 +30,20 @@ The earlier purchase-specific routes remain as a compatibility/demo path. New pr
 
 Pull requests and pushes to `main` build the .NET API, Angular application, and production Docker Compose images in GitHub Actions. A separate [test workflow](.github/workflows/tests.yml) runs xUnit validation and PostgreSQL-backed business scenarios, including restart recovery and simulated HTTPS integrations. See the [verification report](docs/quality/verification.md) for test evidence and known gaps.
 
+## Browser E2E tests
+
+A dedicated [Playwright GitHub Actions workflow](.github/workflows/e2e.yml) launches real
+Chromium, Angular, ASP.NET Core, a disposable PostgreSQL database, and a loopback-only HTTPS
+integration fixture. It exercises the **user interface**, not mocked workflow API responses:
+demo sign-in/out, definition authoring and execution, role-based human tasks, connection
+reachability, and a mobile viewport smoke check.
+
+See [tests/e2e/README.md](tests/e2e/README.md) for local prerequisites and the
+[CI run history](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/e2e.yml).
+This is **Development-mode E2E**. It does not certify production OIDC onboarding,
+registration, MFA, or session federation. These must be checked with a staging identity
+provider before the authentication-related PR can be safely merged.
+
 ## Run locally
 
 Prerequisites: .NET 10 SDK, Node.js 24, npm, and Docker Compose.
@@ -55,7 +69,7 @@ npm ci
 npm start
 ```
 
-Open the Angular dev-server URL shown in the terminal. Its `/api` requests proxy to the local API. In Development only, the UI sends `X-Demo-User` and `X-Demo-Roles` identity headers. The subjects `manager@example.test`, `teamlead@example.test`, `department@example.test`, and `hr@example.test` receive the matching demo role. Other development roles can be entered in the top-bar identity menu. This demo identity handler is not enabled outside Development. For a secured deployment, provide a JWT from the configured host identity provider in the **Host API token** field; the UI keeps it in the current browser tab's session storage. The project does not implement an identity-provider login flow.
+Open the Angular dev-server URL shown in the terminal. Its `/api` requests proxy to the local API. In Development, the sign-in screen lets you choose a demo identity such as `manager@example.test` or `hr@example.test`; the demo role claims are **not** trusted in production. A development identity is persisted locally until you sign out. Outside Development, the app instead offers **Sign in with your organization** through OIDC Authorization Code + PKCE, then verifies the issued access token with `/api/v1/auth/me`. The identity provider manages registration, password reset and MFA. No local username/password accounts are implemented. See [authentication setup and go-live checks](docs/operations/authentication-setup.md).
 
 The API's OpenAPI document is available at `http://localhost:5195/openapi/v1.json` while running in Development. It describes the HTTP operations, the required `Idempotency-Key` header, and the Development-only `X-Demo-User` authentication scheme; OpenAPI is not exposed by the production configuration.
 
@@ -67,7 +81,7 @@ The production Compose stack runs PostgreSQL, the .NET API, and the Angular oper
 Copy-Item .env.example .env
 ```
 
-Edit `.env` before starting the stack. Set a long random hexadecimal `POSTGRES_PASSWORD`, the issuer URL and audience accepted by your identity provider, `OIDC_ROLE_CLAIM` to the JWT claim containing role ids, and `WORKFLOW_ADMIN_ROLE` to the role allowed to edit definitions and connections. Configure your TLS-terminating reverse proxy to forward to the web port (8080 by default).
+Edit `.env` before starting the stack. Set a long random `POSTGRES_PASSWORD`, `OIDC_AUTHORITY` (your OIDC issuer URL), `OIDC_AUDIENCE` (the intended API audience), and `OIDC_CLIENT_ID` (a **public** browser SPA client registered with the provider). Set `OIDC_ROLE_CLAIM` to the JWT claim carrying workflow roles and `WORKFLOW_ADMIN_ROLE` to the role allowed to edit definitions and connections. Set `OIDC_SCOPE` to include any API-specific delegated scope required by your identity provider. An optional `OIDC_REGISTRATION_URL` can link to your provider's HTTPS account-creation page. Configure a TLS-terminating reverse proxy. **Do not deploy the new login flow until you have completed the [OIDC readiness checklist](docs/operations/authentication-setup.md).**
 
 To add an external system connection, add its hostname to `INTEGRATION_ALLOWED_HOSTS` (comma-separated). To store a credential in the web UI, set `INTEGRATION_ENCRYPTION_KEY` to a stable base64-encoded 32-byte key. Generate one with PowerShell:
 
@@ -81,7 +95,7 @@ Keep this key in deployment secrets and back it up separately. Losing or rotatin
 docker compose --env-file .env -f compose.production.yaml up --build --wait
 ```
 
-Open `http://localhost:8080` (or your configured `WEB_PORT`) and enter a host-issued JWT in the **Host API token** field. The API applies EF Core migrations at startup. PostgreSQL data is retained in the `workflow-data` named volume when containers are stopped or recreated.
+Open the configured HTTPS site. The web UI redirects to your identity provider for sign-in; it does not accept a manually pasted JWT. Use `http://localhost:8080` only behind a suitable local TLS setup. The API applies EF Core migrations at startup. PostgreSQL data is retained in the `workflow-data` named volume when containers are stopped or recreated.
 
 To stop the containers while keeping stored workflow data:
 
@@ -107,9 +121,12 @@ For `POST /api/v1/purchase-requests`, retrying with the same actor, key, and nor
 | `GET` | `/api/v1/workflow-definitions/{name}/{revision}` | Read a published definition or an authorized author's draft |
 | `PUT` | `/api/v1/workflow-definitions/{name}/{revision}` | Save a validated draft; requires workflow administrator role |
 | `POST` | `/api/v1/workflow-definitions/{name}/{revision}/publish` | Publish an immutable revision |
+| `GET` | `/api/v1/auth/config` | Public information for browser sign-in; no credentials |
+| `GET` | `/api/v1/auth/me` | Server-verified user subject and role list; requires authentication |
 | `GET` | `/api/v1/integrations` | List connection metadata without secrets |
 | `POST` | `/api/v1/integrations` | Create a secured HTTP connection; requires workflow administrator role |
 | `PUT` | `/api/v1/integrations/{key}` | Update connection name or rotate/clear its secret; base URL is immutable |
+| `POST` | `/api/v1/integrations/{key}/test` | Admin-only HTTPS HEAD probe for an allowlisted connection; does not prove business API permission |
 | `POST` | `/api/v1/workflows/{name}/instances` | Start a definition with JSON input and `Idempotency-Key` |
 | `GET` | `/api/v1/workflow-instances` | List instances started by the caller |
 | `GET` | `/api/v1/workflow-instances/{id}` | Read an authorized instance, input/output, steps, and events |

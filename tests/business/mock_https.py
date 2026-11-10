@@ -23,6 +23,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def do_HEAD(self):
+        # Read-only reachability probe: no workflow side effects.
+        if self.path not in ("/", "/health"):
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_POST(self):
         with lock:
             count = attempts.get(self.path, 0) + 1

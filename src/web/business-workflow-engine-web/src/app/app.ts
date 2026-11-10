@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, JsonPipe } from '@angular/common';
+import { AuthService } from './auth.service';
 
 type NodeType = 'start' | 'set' | 'gateway' | 'userTask' | 'http' | 'end';
 type DataType = 'string' | 'number' | 'integer' | 'boolean';
@@ -28,10 +29,13 @@ interface InstanceDetails { instance: WorkflowInstance; input: unknown; output: 
 })
 export class App implements OnInit {
   private readonly http = inject(HttpClient);
-  readonly actorStorageKey = 'demo-subject';
-  actor = localStorage.getItem(this.actorStorageKey) ?? 'requester@example.test';
+  readonly auth = inject(AuthService);
+  actor = localStorage.getItem('demo-subject') ?? 'requester@example.test';
   rolesText = localStorage.getItem('demo-roles') ?? '';
-  accessToken = sessionStorage.getItem('api-access-token') ?? '';
+  apiStatus: 'checking' | 'ready' | 'down' | 'database' = 'checking';
+  apiStatusMessage = 'Checking API and database readiness…';
+  testingConnection: string | null = null;
+  connectionTests: Record<string, { reachable: boolean; message: string }> = {};
   activeTab: 'workflows' | 'designer' | 'integrations' | 'instances' | 'work' = 'workflows';
   definitions: DefinitionSummary[] = [];
   instances: WorkflowInstance[] = [];
@@ -53,9 +57,59 @@ export class App implements OnInit {
   error = '';
   success = '';
 
-  ngOnInit(): void { this.refreshAll(); }
+  ngOnInit(): void { void this.initialize(); }
+
+  private async initialize(): Promise<void> {
+    await Promise.all([this.auth.initialize(), this.checkApi()]);
+    if (this.auth.authenticated) this.refreshAll();
+  }
+
+  async signIn(): Promise<void> {
+    this.error = '';
+    await this.auth.beginSignIn();
+  }
+
+  async enterDemo(): Promise<void> {
+    this.error = '';
+    if (await this.auth.startDemo(this.actor, this.rolesText)) this.refreshAll();
+  }
+
+  signOut(): void {
+    this.auth.logout();
+    this.definitions = [];
+    this.instances = [];
+    this.integrations = [];
+    this.workItems = [];
+    this.selectedDefinition = null;
+    this.selectedInstance = null;
+    this.activeTab = 'workflows';
+    this.error = '';
+    this.success = '';
+  }
+
+  async checkApi(): Promise<void> {
+    this.apiStatus = 'checking';
+    this.apiStatusMessage = 'Checking API and database readiness…';
+    try {
+      const response = await fetch('/readyz', { cache: 'no-store' });
+      if (response.ok) {
+        this.apiStatus = 'ready';
+        this.apiStatusMessage = 'API and database are available.';
+      } else if (response.status === 503) {
+        this.apiStatus = 'database';
+        this.apiStatusMessage = 'API is reachable but the database is unavailable.';
+      } else {
+        this.apiStatus = 'down';
+        this.apiStatusMessage = 'Readiness check failed (HTTP ' + response.status + ').';
+      }
+    } catch {
+      this.apiStatus = 'down';
+      this.apiStatusMessage = 'Cannot reach the API. Check the web proxy and server.';
+    }
+  }
 
   refreshAll(): void {
+    if (!this.auth.authenticated) return;
     this.error = '';
     this.http.get<DefinitionSummary[]>('/api/v1/workflow-definitions').subscribe({ next: value => this.definitions = value, error: e => this.showError(e) });
     this.refreshInstances();
@@ -72,17 +126,6 @@ export class App implements OnInit {
       this.workItems = value;
       for (const item of value) this.completionValues[item.id] ??= this.completionExample(item.completionSchema);
     }, error: e => this.showError(e) });
-  }
-
-  switchActor(): void {
-    localStorage.setItem(this.actorStorageKey, this.actor.trim());
-    localStorage.setItem('demo-roles', this.rolesText.trim());
-    location.reload();
-  }
-
-  saveAccessToken(): void {
-    if (this.accessToken.trim()) sessionStorage.setItem('api-access-token', this.accessToken.trim());
-    else sessionStorage.removeItem('api-access-token');
   }
 
   refreshIntegrations(): void { this.http.get<IntegrationConnection[]>('/api/v1/integrations').subscribe({ next: value => this.integrations = value, error: e => this.showError(e) }); }
@@ -103,7 +146,29 @@ export class App implements OnInit {
     const request = this.editingIntegration
       ? this.http.put(`/api/v1/integrations/${this.editingIntegration}`, body)
       : this.http.post('/api/v1/integrations', body);
-    request.subscribe({ next: () => { this.busy = false; this.success = 'Integration connection saved. Secret values are never displayed again.'; this.newIntegration(); this.refreshIntegrations(); }, error: e => { this.busy = false; this.showError(e); } });
+    request.subscribe({ next: () => { this.busy = false; this.newIntegration(); this.success = 'Connection saved. Secret values are never displayed again.'; this.refreshIntegrations(); }, error: e => { this.busy = false; this.showError(e); } });
+  }
+
+
+  testConnection(connection: IntegrationConnection): void {
+    this.testingConnection = connection.key;
+    this.error = '';
+    this.http.post<{ reachable: boolean; statusCode: number; credentialStatus: string; message: string }>(
+      `/api/v1/integrations/${encodeURIComponent(connection.key)}/test`, {}
+    ).subscribe({
+      next: result => {
+        this.testingConnection = null;
+        this.connectionTests[connection.key] = {
+          reachable: result.reachable,
+          message: result.message + ' (HTTP ' + result.statusCode + ')'
+        };
+      },
+      error: error => {
+        this.testingConnection = null;
+        this.connectionTests[connection.key] = { reachable: false, message: 'Connection probe failed.' };
+        this.showError(error);
+      }
+    });
   }
 
   newWorkflow(): void {
@@ -320,7 +385,27 @@ export class App implements OnInit {
     return Object.entries(properties).map(([name, schema]) => ({ name, schema: schema as Record<string, any>, required: required.includes(name) }));
   }
   private showError(error: HttpErrorResponse): void {
+    if (error.status === 401 && !this.auth.isDemo) {
+      this.auth.sessionExpired();
+      return;
+    }
     const validation = error.error?.errors && Object.values(error.error.errors).flat().join(' ');
-    this.error = error.status === 0 ? 'Could not reach the API. Start PostgreSQL and the API, then refresh.' : validation || error.error?.error || error.error?.title || `Request failed (${error.status}).`;
+    const fromApi = validation || error.error?.error || error.error?.detail || error.error?.title;
+    const fallback: Record<number, string> = {
+      0: 'Unable to reach the API. Check the web proxy, network and server, then try again.',
+      400: 'The request was rejected. Review the form fields.',
+      401: 'Sign in with an authorized account to continue.',
+      403: 'Your account does not have permission to perform this action.',
+      404: 'The requested resource was not found.',
+      409: 'This change conflicts with the current resource. Refresh and retry.',
+      429: 'Too many requests. Try again later.',
+      500: 'The server encountered an error. Check server logs if this continues.',
+      502: 'The external service could not be reached.',
+      503: 'A required service is unavailable. Check API readiness and configuration.',
+      504: 'The request timed out. Check the service and retry.'
+    };
+    this.error = typeof fromApi === 'string' && fromApi.trim()
+      ? fromApi : fallback[error.status] ?? `Request failed (HTTP ${error.status}).`;
+    if (error.status === 0 || error.status === 503) void this.checkApi();
   }
 }
