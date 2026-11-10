@@ -141,7 +141,7 @@ test('typography remains readable on desktop and mobile', async ({ page }) => {
   ));
   expect(await size('.access-intro')).toBeGreaterThanOrEqual(16);
   expect(await size('.access-submit')).toBeGreaterThanOrEqual(16);
-  expect(await size('.access-signup')).toBeGreaterThanOrEqual(14);
+  expect(await size('.demo-notice p')).toBeGreaterThanOrEqual(14);
   await enterDemo(page);
   expect(await size('nav button')).toBeGreaterThanOrEqual(14);
   expect(await size('.workflow-card>p')).toBeGreaterThanOrEqual(14);
@@ -149,6 +149,7 @@ test('typography remains readable on desktop and mobile', async ({ page }) => {
   expect(await size('.card-meta')).toBeGreaterThanOrEqual(12);
   await page.getByRole('button', { name: /New workflow/ }).click();
   expect(await size('.settings-grid input')).toBeGreaterThanOrEqual(16);
+  await page.getByRole('button', { name: 'Role task' }).click();
   expect(await size('.node-body input')).toBeGreaterThanOrEqual(16);
 
   await page.setViewportSize({ width: 390, height: 844 });
