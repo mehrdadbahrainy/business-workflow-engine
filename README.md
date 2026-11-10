@@ -30,6 +30,20 @@ The earlier purchase-specific routes remain as a compatibility/demo path. New pr
 
 Pull requests and pushes to `main` build the .NET API, Angular application, and production Docker Compose images in GitHub Actions. A separate [test workflow](.github/workflows/tests.yml) runs xUnit validation and PostgreSQL-backed business scenarios, including restart recovery and simulated HTTPS integrations. See the [verification report](docs/quality/verification.md) for test evidence and known gaps.
 
+## Browser E2E tests
+
+A dedicated [Playwright GitHub Actions workflow](.github/workflows/e2e.yml) launches real
+Chromium, Angular, ASP.NET Core, a disposable PostgreSQL database, and a loopback-only HTTPS
+integration fixture. It exercises the **user interface**, not mocked workflow API responses:
+demo sign-in/out, definition authoring and execution, role-based human tasks, connection
+reachability, and a mobile viewport smoke check.
+
+See [tests/e2e/README.md](tests/e2e/README.md) for local prerequisites and the
+[CI run history](https://github.com/mehrdadbahrainy/business-workflow-engine/actions/workflows/e2e.yml).
+This is **Development-mode E2E**. It does not certify production OIDC onboarding,
+registration, MFA, or session federation. These must be checked with a staging identity
+provider before the authentication-related PR can be safely merged.
+
 ## Run locally
 
 Prerequisites: .NET 10 SDK, Node.js 24, npm, and Docker Compose.
